@@ -56,6 +56,12 @@ export default async function DashboardLayout({
           >
             データ入力
           </Link>
+          <Link
+            href="/dashboard/settings"
+            className="text-sm font-medium text-slate-600 hover:text-slate-900"
+          >
+            設定
+          </Link>
         </div>
       </nav>
 

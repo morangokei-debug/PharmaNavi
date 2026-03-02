@@ -27,9 +27,12 @@ cp .env.example .env.local
 
 ### 2. Supabase プロジェクト設定
 
-1. [Supabase](https://supabase.com) でプロジェクトを作成
-2. SQL Editor で `supabase/migrations/` 内のSQLを順に実行
-3. Authentication > Providers で Email を有効化
+**接続先**: https://supabase.com/dashboard/project/xnbzwibqypkgvqmulptn
+
+1. SQL Editor で以下を**順に**実行：
+   - `supabase/migrations/20240302000001_pharma_schema.sql`
+   - `supabase/migrations/20240302000002_pharma_auth_trigger.sql`
+2. Authentication > Providers で Email が有効か確認
 
 ### 3. 開発サーバー起動
 
