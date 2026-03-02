@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { APPROVAL_MASTER } from '@/lib/approval-master'
 
@@ -19,6 +20,7 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const supabase = createClient()
+  const router = useRouter()
 
   const fetchData = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -103,6 +105,7 @@ export default function SettingsPage() {
     setNewOrgName('')
     setMessage('組織を作成しました')
     await fetchData()
+    router.refresh()
     setSaving(false)
   }
 
@@ -112,16 +115,23 @@ export default function SettingsPage() {
     setSaving(true)
     setMessage(null)
 
-    const { error } = await supabase
+    const pharmacyName = newPharmacyName.trim()
+    const { data: newPharmacy, error } = await supabase
       .from('pharma_pharmacies')
-      .insert({ organization_id: selectedOrgId, name: newPharmacyName.trim() })
+      .insert({ organization_id: selectedOrgId, name: pharmacyName })
+      .select('id, name, organization_id')
+      .single()
 
     if (error) {
       setMessage('店舗の作成に失敗しました: ' + error.message)
-    } else {
+    } else if (newPharmacy) {
+      setPharmacies((prev) => [...prev, newPharmacy])
+      setApprovalsByPharmacy((prev) => ({ ...prev, [newPharmacy.id]: [] }))
       setNewPharmacyName('')
       setMessage('店舗を作成しました')
-      await fetchData()
+      router.refresh()
+    } else {
+      setMessage('店舗の作成に失敗しました')
     }
     setSaving(false)
   }
