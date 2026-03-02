@@ -97,6 +97,9 @@ export default function SettingsPage() {
       return
     }
 
+    const createdOrgName = newOrgName.trim()
+    setOrgs([{ id: result.id, name: createdOrgName }])
+    setSelectedOrgId(result.id)
     setNewOrgName('')
     setMessage('組織を作成しました')
     await fetchData()
