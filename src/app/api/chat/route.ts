@@ -1,7 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import { GoogleGenAI } from '@google/genai'
 import { formatRequirementsJson } from '@/lib/format-requirements'
+
+// gemini-1.5-flash: 安定稼働・無料枠対応。2.0系が使えない場合はこれを使用
+const GEMINI_MODEL = 'gemini-1.5-flash'
 
 const KASAN_CONTEXT = `
 ## 令和6年診療報酬改定 主要加算一覧
@@ -114,18 +117,16 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-1.5-flash',
-      systemInstruction: SYSTEM_PROMPT,
-    })
-
+    const ai = new GoogleGenAI({ apiKey })
     const fullPrompt = `${userContext ? `\n${userContext}\n\n` : ''}ユーザーの質問: ${message.trim()}`
 
-    const result = await model.generateContent(fullPrompt)
+    const response = await ai.models.generateContent({
+      model: GEMINI_MODEL,
+      contents: fullPrompt,
+      config: { systemInstruction: SYSTEM_PROMPT },
+    })
 
-    const response = result.response
-    const text = response.text()
+    const text = response.text
     if (!text) {
       return NextResponse.json({ error: 'AIからの応答を取得できませんでした' }, { status: 500 })
     }

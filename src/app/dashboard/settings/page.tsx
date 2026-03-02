@@ -76,25 +76,26 @@ export default function SettingsPage() {
     setSaving(true)
     setMessage(null)
 
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+    const { data, error } = await supabase.rpc('create_organization', {
+      org_name: newOrgName.trim(),
+    })
 
-    const { data: newOrg, error: orgError } = await supabase
-      .from('pharma_organizations')
-      .insert({ name: newOrgName.trim() })
-      .select('id')
-      .single()
-
-    if (orgError) {
-      setMessage('組織の作成に失敗しました: ' + orgError.message)
+    if (error) {
+      setMessage('組織の作成に失敗しました: ' + error.message)
       setSaving(false)
       return
     }
-
-    await supabase
-      .from('pharma_profiles')
-      .update({ organization_id: newOrg.id })
-      .eq('id', user.id)
+    const result = data as { id?: string; error?: string } | null
+    if (result?.error) {
+      setMessage('組織の作成に失敗しました: ' + result.error)
+      setSaving(false)
+      return
+    }
+    if (!result?.id) {
+      setMessage('組織の作成に失敗しました')
+      setSaving(false)
+      return
+    }
 
     setNewOrgName('')
     setMessage('組織を作成しました')
