@@ -23,7 +23,7 @@ cp .env.example .env.local
 必須項目:
 - `NEXT_PUBLIC_SUPABASE_URL` - Supabase プロジェクトURL
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Supabase 匿名キー
-- `GOOGLE_API_KEY` - Gemini API キー（AI機能用）
+- `GOOGLE_API_KEY` - Gemini API キー（AIアドバイス機能用。未設定の場合はAI機能が利用できません）
 
 ### 2. Supabase プロジェクト設定
 
