@@ -220,16 +220,15 @@ export default function SettingsPage() {
             <div className="space-y-3">
               <p className="text-pharma-text-muted text-sm">先に組織を作成してください。</p>
               <p className="text-pharma-text-muted text-sm">
-                組織を作成したあと表示されない場合は、
-                <button
-                  type="button"
-                  onClick={() => { setLoading(true); fetchData().finally(() => setLoading(false)) }}
-                  className="text-pharma-accent hover:underline font-medium"
-                >
-                  ここをクリックして再読み込み
-                </button>
-                してください。
+                組織を作成したのに店舗入力欄が表示されない場合は、下のボタンで再読み込みしてください。
               </p>
+              <button
+                type="button"
+                onClick={() => { setLoading(true); fetchData().finally(() => setLoading(false)) }}
+                className={`${btnPrimary} text-sm`}
+              >
+                再読み込み
+              </button>
             </div>
           ) : (
             <>
