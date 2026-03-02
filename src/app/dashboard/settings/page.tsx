@@ -217,7 +217,20 @@ export default function SettingsPage() {
         <section className="bg-pharma-bg-secondary rounded-xl p-6 border border-pharma">
           <h2 className="text-lg font-semibold text-pharma-text-primary mb-4">店舗の追加</h2>
           {orgs.length === 0 ? (
-            <p className="text-pharma-text-muted text-sm">先に組織を作成してください。</p>
+            <div className="space-y-3">
+              <p className="text-pharma-text-muted text-sm">先に組織を作成してください。</p>
+              <p className="text-pharma-text-muted text-sm">
+                組織を作成したあと表示されない場合は、
+                <button
+                  type="button"
+                  onClick={() => { setLoading(true); fetchData().finally(() => setLoading(false)) }}
+                  className="text-pharma-accent hover:underline font-medium"
+                >
+                  ここをクリックして再読み込み
+                </button>
+                してください。
+              </p>
+            </div>
           ) : (
             <>
               <p className="text-sm text-pharma-text-muted mb-4">組織に店舗を追加します。</p>
