@@ -6,6 +6,13 @@ import Link from 'next/link'
 
 type Pharmacy = { id: string; name: string }
 type Item = { code: string; name: string; unit: string }
+type ImportLog = {
+  id: string
+  file_name: string
+  row_count: number | null
+  imported_at: string
+  pharmacy_name: string
+}
 
 export default function InputPage() {
   const [pharmacies, setPharmacies] = useState<Pharmacy[]>([])
@@ -18,6 +25,7 @@ export default function InputPage() {
   const [message, setMessage] = useState<string | null>(null)
   const [csvFile, setCsvFile] = useState<File | null>(null)
   const [csvImporting, setCsvImporting] = useState(false)
+  const [importLogs, setImportLogs] = useState<ImportLog[]>([])
   const supabase = createClient()
 
   useEffect(() => {
@@ -36,6 +44,27 @@ export default function InputPage() {
 
       const now = new Date()
       setYearMonth(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`)
+
+      if (phData?.length) {
+        const phIds = phData.map((p) => p.id)
+        const { data: logs } = await supabase
+          .from('pharma_csv_import_logs')
+          .select('id, file_name, row_count, imported_at, pharmacy_id')
+          .in('pharmacy_id', phIds)
+          .order('imported_at', { ascending: false })
+          .limit(10)
+        if (logs) {
+          const phMap: Record<string, string> = {}
+          phData.forEach((p) => { phMap[p.id] = p.name })
+          setImportLogs(logs.map((l) => ({
+            id: l.id,
+            file_name: l.file_name,
+            row_count: l.row_count,
+            imported_at: l.imported_at,
+            pharmacy_name: phMap[l.pharmacy_id] ?? '-',
+          })))
+        }
+      }
       setLoading(false)
     }
     load()
@@ -105,6 +134,13 @@ export default function InputPage() {
       const v: Record<string, string> = {}
       data.items?.forEach((r: { code: string; value: number }) => { v[r.code] = String(r.value) })
       setValues((prev) => ({ ...prev, ...v }))
+      setImportLogs((prev) => [{
+        id: crypto.randomUUID(),
+        file_name: csvFile?.name ?? '',
+        row_count: data.row_count ?? null,
+        imported_at: new Date().toISOString(),
+        pharmacy_name: pharmacies.find((p) => p.id === selectedPharmacy)?.name ?? '-',
+      }, ...prev.slice(0, 9)])
     }
     setCsvImporting(false)
   }
@@ -189,6 +225,38 @@ export default function InputPage() {
               </button>
             </form>
           </div>
+
+          {importLogs.length > 0 && (
+            <div className="mb-6 bg-pharma-bg-secondary rounded-xl p-6 border border-pharma">
+              <h2 className="text-lg font-semibold text-pharma-text-primary mb-3">取り込み履歴</h2>
+              <div className="text-sm">
+                <table className="w-full">
+                  <thead>
+                    <tr className="text-pharma-text-muted border-b border-pharma">
+                      <th className="text-left py-2 font-medium">日時</th>
+                      <th className="text-left py-2 font-medium">ファイル</th>
+                      <th className="text-left py-2 font-medium">店舗</th>
+                      <th className="text-right py-2 font-medium">行数</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {importLogs.map((l) => (
+                      <tr key={l.id} className="border-b border-pharma/50">
+                        <td className="py-2 text-pharma-text-secondary">
+                          {new Date(l.imported_at).toLocaleString('ja-JP')}
+                        </td>
+                        <td className="py-2 text-pharma-text-secondary">{l.file_name}</td>
+                        <td className="py-2 text-pharma-text-secondary">{l.pharmacy_name}</td>
+                        <td className="py-2 text-pharma-text-secondary text-right">
+                          {l.row_count != null ? l.row_count.toLocaleString() : '-'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           <form onSubmit={handleSave} className="space-y-6">
             <div className="bg-pharma-bg-secondary rounded-xl p-6 border border-pharma">

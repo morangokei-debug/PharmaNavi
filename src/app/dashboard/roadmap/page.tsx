@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import { formatRequirementsJson } from '@/lib/format-requirements'
 
 export default async function RoadmapPage() {
   const supabase = await createClient()
@@ -13,7 +14,7 @@ export default async function RoadmapPage() {
     .eq('id', user.id)
     .single()
 
-  let kasanList: { id: string; code: string; name: string; points: number }[] = []
+  let kasanList: { id: string; code: string; name: string; points: number; requirements_json: unknown }[] = []
   let pharmacyIds: string[] = []
   const now = new Date()
   const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
@@ -27,7 +28,7 @@ export default async function RoadmapPage() {
 
     const { data: kasan } = await supabase
       .from('pharma_kasan_master')
-      .select('id, code, name, points')
+      .select('id, code, name, points, requirements_json')
       .eq('revision_year', 2024)
       .order('code')
     kasanList = kasan ?? []
@@ -66,18 +67,31 @@ export default async function RoadmapPage() {
               status === 'achieved' ? 'bg-pharma-success/20 text-pharma-success border-pharma-success/40' :
               status === 'partial' ? 'bg-pharma-warning/20 text-pharma-warning border-pharma-warning/40' :
               'bg-pharma-bg-tertiary text-pharma-text-muted border-pharma'
+            const conditions = formatRequirementsJson(k.requirements_json)
             return (
               <div
                 key={k.id}
-                className="bg-pharma-bg-secondary rounded-xl p-6 border border-pharma flex items-center justify-between"
+                className="bg-pharma-bg-secondary rounded-xl p-6 border border-pharma"
               >
-                <div>
-                  <h3 className="font-semibold text-pharma-text-primary">{k.name}</h3>
-                  <p className="text-sm text-pharma-text-muted">{k.points}点</p>
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <h3 className="font-semibold text-pharma-text-primary">{k.name}</h3>
+                    <p className="text-sm text-pharma-text-muted">{k.points}点</p>
+                  </div>
+                  <span className={`px-3 py-1 rounded-full text-sm font-medium border ${badge}`}>
+                    {status === 'achieved' ? '達成' : status === 'partial' ? '一部達成' : '未達'}
+                  </span>
                 </div>
-                <span className={`px-3 py-1 rounded-full text-sm font-medium border ${badge}`}>
-                  {status === 'achieved' ? '達成' : status === 'partial' ? '一部達成' : '未達'}
-                </span>
+                {conditions.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-pharma">
+                    <p className="text-xs font-medium text-pharma-text-muted mb-1">達成条件</p>
+                    <ul className="text-sm text-pharma-text-secondary space-y-0.5">
+                      {conditions.map((c, i) => (
+                        <li key={i}>・{c}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             )
           })}

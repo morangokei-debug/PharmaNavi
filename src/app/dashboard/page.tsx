@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import { DashboardChart } from '@/components/DashboardChart'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -16,6 +17,7 @@ export default async function DashboardPage() {
   let achievedCount = 0
   let totalCount = 0
   let pharmacyCount = 0
+  const pharmacyIds: string[] = []
 
   if (profile?.organization_id) {
     const { data: pharmacies } = await supabase
@@ -23,6 +25,7 @@ export default async function DashboardPage() {
       .select('id')
       .eq('organization_id', profile.organization_id)
     pharmacyCount = pharmacies?.length ?? 0
+    if (pharmacies) pharmacyIds.push(...pharmacies.map((p) => p.id))
 
     const { data: kasanList } = await supabase
       .from('pharma_kasan_master')
@@ -84,6 +87,8 @@ export default async function DashboardPage() {
           </p>
         )}
       </div>
+
+      {pharmacyIds.length > 0 && <DashboardChart pharmacyIds={pharmacyIds} />}
     </div>
   )
 }

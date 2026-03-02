@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation'
 const links = [
   { href: '/dashboard', label: 'ダッシュボード' },
   { href: '/dashboard/roadmap', label: '加算ロードマップ' },
+  { href: '/dashboard/tasks', label: 'タスク' },
   { href: '/dashboard/input', label: 'データ入力' },
   { href: '/dashboard/settings', label: '設定' },
 ] as const
