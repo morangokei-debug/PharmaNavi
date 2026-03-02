@@ -48,14 +48,14 @@ export default async function RoadmapPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-slate-800 mb-6">加算ロードマップ</h1>
-      <p className="text-slate-600 mb-6">対象月: {ym}</p>
+      <h1 className="text-2xl font-heading font-bold text-pharma-text-primary mb-6">加算ロードマップ</h1>
+      <p className="text-pharma-text-muted mb-6">対象月: {ym}</p>
 
       {!profile?.organization_id || pharmacyIds.length === 0 ? (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-6">
-          <p className="text-amber-800 font-medium">組織・店舗の設定が必要です</p>
-          <p className="text-amber-700 text-sm mt-2">
-            <Link href="/dashboard/settings" className="underline">設定</Link>から組織と店舗を作成してください。
+        <div className="bg-pharma-bg-secondary border border-pharma-warning/50 rounded-xl p-6">
+          <p className="text-pharma-warning font-medium">組織・店舗の設定が必要です</p>
+          <p className="text-pharma-text-secondary text-sm mt-2">
+            <Link href="/dashboard/settings" className="text-pharma-accent underline hover:text-pharma-accent-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-pharma-focus focus-visible:rounded">設定</Link>から組織と店舗を作成してください。
           </p>
         </div>
       ) : (
@@ -63,26 +63,29 @@ export default async function RoadmapPage() {
           {kasanList.map((k) => {
             const status = statusMap[k.id] ?? 'pending'
             const badge =
-              status === 'achieved' ? 'bg-emerald-100 text-emerald-800' :
-              status === 'partial' ? 'bg-amber-100 text-amber-800' :
-              'bg-slate-100 text-slate-600'
+              status === 'achieved' ? 'bg-pharma-success/20 text-pharma-success border-pharma-success/40' :
+              status === 'partial' ? 'bg-pharma-warning/20 text-pharma-warning border-pharma-warning/40' :
+              'bg-pharma-bg-tertiary text-pharma-text-muted border-pharma'
             return (
               <div
                 key={k.id}
-                className="bg-white rounded-xl p-6 shadow-sm border border-slate-200 flex items-center justify-between"
+                className="bg-pharma-bg-secondary rounded-xl p-6 border border-pharma flex items-center justify-between"
               >
                 <div>
-                  <h3 className="font-semibold text-slate-800">{k.name}</h3>
-                  <p className="text-sm text-slate-600">{k.points}点</p>
+                  <h3 className="font-semibold text-pharma-text-primary">{k.name}</h3>
+                  <p className="text-sm text-pharma-text-muted">{k.points}点</p>
                 </div>
-                <span className={`px-3 py-1 rounded-full text-sm font-medium ${badge}`}>
+                <span className={`px-3 py-1 rounded-full text-sm font-medium border ${badge}`}>
                   {status === 'achieved' ? '達成' : status === 'partial' ? '一部達成' : '未達'}
                 </span>
               </div>
             )
           })}
           {kasanList.length === 0 && (
-            <p className="text-slate-600">加算マスタが登録されていません。SQLでシードデータを投入してください。</p>
+            <div className="bg-pharma-bg-secondary rounded-xl p-12 text-center">
+              <p className="text-pharma-text-muted text-lg mb-2">加算マスタが登録されていません</p>
+              <p className="text-pharma-text-muted text-sm">SQL Editorでシードデータを投入してください。</p>
+            </div>
           )}
         </div>
       )}

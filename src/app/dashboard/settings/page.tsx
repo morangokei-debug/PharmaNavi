@@ -160,22 +160,42 @@ export default function SettingsPage() {
   const isApproved = (pharmacyId: string, code: string) =>
     approvalsByPharmacy[pharmacyId]?.some((a) => a.approval_code === code && a.approved_at) ?? false
 
-  if (loading) return <p className="text-slate-600">読み込み中...</p>
+  const inputBase = 'px-4 py-3 bg-pharma-bg-tertiary border border-pharma rounded-lg text-pharma-text-primary placeholder-pharma-muted transition-[border-color,box-shadow] focus:outline-none focus:border-pharma-focus focus:ring-[3px] focus:ring-[var(--accent-glow)] focus:ring-offset-0 disabled:opacity-40 disabled:cursor-not-allowed'
+  const btnPrimary = 'min-h-[40px] px-4 py-2 bg-pharma-accent text-white font-semibold rounded-lg shadow-glow transition-all hover:bg-pharma-accent-secondary hover:shadow-glow-lg active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-pharma-focus focus-visible:outline-offset-3'
+
+  if (loading) {
+    return (
+      <div>
+        <div className="h-8 w-24 skeleton mb-6" />
+        <div className="space-y-8">
+          <div className="h-32 skeleton rounded-xl" />
+          <div className="h-40 skeleton rounded-xl" />
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-slate-800 mb-6">設定</h1>
+      <h1 className="text-2xl font-heading font-bold text-pharma-text-primary mb-6">設定</h1>
 
       {message && (
-        <div className="mb-4 p-3 bg-emerald-50 text-emerald-800 rounded-lg text-sm">
+        <div
+          role="alert"
+          className={`mb-4 p-3 rounded-lg text-sm border ${
+            message.includes('失敗')
+              ? 'bg-pharma-error/10 text-pharma-error border-pharma-error/50'
+              : 'bg-pharma-success/10 text-pharma-success border-pharma-success/50'
+          }`}
+        >
           {message}
         </div>
       )}
 
       <div className="space-y-8">
-        <section className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
-          <h2 className="text-lg font-semibold text-slate-800 mb-4">組織の作成</h2>
-          <p className="text-sm text-slate-600 mb-4">
+        <section className="bg-pharma-bg-secondary rounded-xl p-6 border border-pharma">
+          <h2 className="text-lg font-semibold text-pharma-text-primary mb-4">組織の作成</h2>
+          <p className="text-sm text-pharma-text-muted mb-4">
             まだ組織がない場合、まず組織を作成してください。作成すると自動的にあなたがその組織に紐づきます。
           </p>
           <form onSubmit={createOrg} className="flex gap-3">
@@ -184,48 +204,52 @@ export default function SettingsPage() {
               value={newOrgName}
               onChange={(e) => setNewOrgName(e.target.value)}
               placeholder="組織名（例：〇〇薬局グループ）"
-              className="flex-1 px-4 py-2 border border-slate-300 rounded-lg"
+              className={`flex-1 ${inputBase}`}
+              aria-label="組織名"
             />
-            <button
-              type="submit"
-              disabled={saving}
-              className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50"
-            >
+            <button type="submit" disabled={saving} className={btnPrimary}>
               作成
             </button>
           </form>
         </section>
 
-        <section className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
-          <h2 className="text-lg font-semibold text-slate-800 mb-4">店舗の追加</h2>
+        <section className="bg-pharma-bg-secondary rounded-xl p-6 border border-pharma">
+          <h2 className="text-lg font-semibold text-pharma-text-primary mb-4">店舗の追加</h2>
           {orgs.length === 0 ? (
-            <p className="text-slate-600 text-sm">先に組織を作成してください。</p>
+            <p className="text-pharma-text-muted text-sm">先に組織を作成してください。</p>
           ) : (
             <>
-              <p className="text-sm text-slate-600 mb-4">組織に店舗を追加します。</p>
+              <p className="text-sm text-pharma-text-muted mb-4">組織に店舗を追加します。</p>
               <form onSubmit={createPharmacy} className="flex flex-col gap-3">
-                <select
-                  value={selectedOrgId}
-                  onChange={(e) => setSelectedOrgId(e.target.value)}
-                  className="px-4 py-2 border border-slate-300 rounded-lg"
-                >
-                  <option value="">組織を選択</option>
-                  {orgs.map((o) => (
-                    <option key={o.id} value={o.id}>{o.name}</option>
-                  ))}
-                </select>
+                <div>
+                  <label htmlFor="org-select" className="block text-sm font-medium text-pharma-text-secondary mb-1.5">
+                    組織
+                  </label>
+                  <select
+                    id="org-select"
+                    value={selectedOrgId}
+                    onChange={(e) => setSelectedOrgId(e.target.value)}
+                    className={`w-full ${inputBase}`}
+                  >
+                    <option value="">組織を選択</option>
+                    {orgs.map((o) => (
+                      <option key={o.id} value={o.id}>{o.name}</option>
+                    ))}
+                  </select>
+                </div>
                 <div className="flex gap-3">
                   <input
                     type="text"
                     value={newPharmacyName}
                     onChange={(e) => setNewPharmacyName(e.target.value)}
                     placeholder="店舗名"
-                    className="flex-1 px-4 py-2 border border-slate-300 rounded-lg"
+                    className={`flex-1 ${inputBase}`}
+                    aria-label="店舗名"
                   />
                   <button
                     type="submit"
                     disabled={saving || !selectedOrgId}
-                    className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50"
+                    className={btnPrimary}
                   >
                     追加
                   </button>
@@ -233,8 +257,8 @@ export default function SettingsPage() {
               </form>
               {pharmacies.length > 0 && (
                 <div className="mt-4">
-                  <p className="text-sm font-medium text-slate-700 mb-2">登録済み店舗</p>
-                  <ul className="text-sm text-slate-600">
+                  <p className="text-sm font-medium text-pharma-text-secondary mb-2">登録済み店舗</p>
+                  <ul className="text-sm text-pharma-text-muted space-y-1">
                     {pharmacies.map((p) => (
                       <li key={p.id}>・{p.name}</li>
                     ))}
@@ -246,25 +270,25 @@ export default function SettingsPage() {
         </section>
 
         {pharmacies.length > 0 && (
-          <section className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
-            <h2 className="text-lg font-semibold text-slate-800 mb-4">届出管理</h2>
-            <p className="text-sm text-slate-600 mb-4">
+          <section className="bg-pharma-bg-secondary rounded-xl p-6 border border-pharma">
+            <h2 className="text-lg font-semibold text-pharma-text-primary mb-4">届出管理</h2>
+            <p className="text-sm text-pharma-text-muted mb-4">
               各店舗の届出状況を登録します。加算の達成判定に使用されます。
             </p>
             <div className="space-y-6">
               {pharmacies.map((ph) => (
-                <div key={ph.id} className="border border-slate-200 rounded-lg p-4">
-                  <p className="font-medium text-slate-800 mb-3">{ph.name}</p>
+                <div key={ph.id} className="border border-pharma rounded-lg p-4 bg-pharma-bg-tertiary/50">
+                  <p className="font-medium text-pharma-text-primary mb-3">{ph.name}</p>
                   <div className="flex flex-wrap gap-4">
                     {APPROVAL_MASTER.map((a) => (
-                      <label key={a.code} className="flex items-center gap-2 cursor-pointer">
+                      <label key={a.code} className="flex items-center gap-2 cursor-pointer min-h-[44px]">
                         <input
                           type="checkbox"
                           checked={isApproved(ph.id, a.code)}
                           onChange={(e) => toggleApproval(ph.id, a.code, e.target.checked)}
-                          className="rounded border-slate-300"
+                          className="w-5 h-5 rounded border-pharma bg-pharma-bg-tertiary text-pharma-accent focus:ring-pharma-focus focus:ring-2"
                         />
-                        <span className="text-sm text-slate-700">{a.name}</span>
+                        <span className="text-sm text-pharma-text-secondary">{a.name}</span>
                       </label>
                     ))}
                   </div>

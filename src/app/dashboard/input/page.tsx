@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import Link from 'next/link'
 
 type Pharmacy = { id: string; name: string }
 type Item = { code: string; name: string; unit: string }
@@ -108,60 +109,99 @@ export default function InputPage() {
     setCsvImporting(false)
   }
 
-  if (loading) return <p className="text-slate-600">読み込み中...</p>
+  const inputBase = 'w-full px-4 py-3 bg-pharma-bg-tertiary border border-pharma rounded-lg text-pharma-text-primary placeholder-pharma-muted transition-[border-color,box-shadow] focus:outline-none focus:border-pharma-focus focus:ring-[3px] focus:ring-[var(--accent-glow)] focus:ring-offset-0 disabled:opacity-40 disabled:cursor-not-allowed'
+  const btnPrimary = 'min-h-[40px] px-6 py-3 bg-pharma-accent text-white font-semibold rounded-lg shadow-glow transition-all hover:bg-pharma-accent-secondary hover:shadow-glow-lg active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-pharma-focus focus-visible:outline-offset-3'
+
+  if (loading) {
+    return (
+      <div>
+        <div className="h-8 w-48 skeleton mb-6" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <div className="h-20 skeleton rounded-xl" />
+          <div className="h-20 skeleton rounded-xl" />
+        </div>
+        <div className="space-y-3">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="h-12 skeleton rounded-lg" />
+          ))}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-slate-800 mb-6">データ入力</h1>
+      <h1 className="text-2xl font-heading font-bold text-pharma-text-primary mb-6">データ入力</h1>
 
       {pharmacies.length === 0 ? (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-6">
-          <p className="text-amber-800 font-medium">店舗が登録されていません</p>
-          <p className="text-amber-700 text-sm mt-2">
-            <a href="/dashboard/settings" className="underline">設定</a>から組織と店舗を作成してください。
+        <div className="bg-pharma-bg-secondary border border-pharma-warning/50 rounded-xl p-6">
+          <p className="text-pharma-warning font-medium">店舗が登録されていません</p>
+          <p className="text-pharma-text-secondary text-sm mt-2">
+            <Link href="/dashboard/settings" className="text-pharma-accent underline hover:text-pharma-accent-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-pharma-focus focus-visible:rounded">設定</Link>から組織と店舗を作成してください。
           </p>
         </div>
       ) : (
         <>
           {message && (
-            <div className={`mb-4 p-3 rounded-lg text-sm ${message.includes('失敗') ? 'bg-red-50 text-red-800' : 'bg-emerald-50 text-emerald-800'}`}>
+            <div
+              role="alert"
+              className={`mb-4 p-3 rounded-lg text-sm border ${
+                message.includes('失敗')
+                  ? 'bg-pharma-error/10 text-pharma-error border-pharma-error/50'
+                  : 'bg-pharma-success/10 text-pharma-success border-pharma-success/50'
+              }`}
+            >
               {message}
             </div>
           )}
 
-          <div className="mb-6 bg-slate-50 rounded-xl p-6 border border-slate-200">
-            <h2 className="text-lg font-semibold text-slate-800 mb-3">CSV取り込み</h2>
-            <p className="text-sm text-slate-600 mb-3">
+          <div className="mb-6 bg-pharma-bg-secondary rounded-xl p-6 border border-pharma">
+            <h2 className="text-lg font-semibold text-pharma-text-primary mb-3">CSV取り込み</h2>
+            <p className="text-sm text-pharma-text-muted mb-3">
               ReceptyなどレセコンのCSVをアップロードすると、列名から自動でマッピングして月次実績に取り込みます。
             </p>
             <form onSubmit={handleCsvImport} className="flex flex-wrap items-end gap-3">
               <div className="flex-1 min-w-[200px]">
+                <label htmlFor="csv-file" className="block text-sm font-medium text-pharma-text-secondary mb-1.5">
+                  CSVファイル
+                </label>
                 <input
+                  id="csv-file"
                   type="file"
                   accept=".csv"
                   onChange={(e) => setCsvFile(e.target.files?.[0] ?? null)}
-                  className="block w-full text-sm text-slate-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-emerald-50 file:text-emerald-700"
+                  className="block w-full text-sm text-pharma-text-secondary file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-pharma-bg-tertiary file:text-pharma-accent file:font-medium file:cursor-pointer hover:file:bg-pharma-accent/20"
                 />
               </div>
               <button
                 type="submit"
                 disabled={csvImporting || !csvFile || !selectedPharmacy}
-                className="px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50"
+                className={btnPrimary}
               >
-                {csvImporting ? '取り込み中...' : '取り込む'}
+                {csvImporting ? (
+                  <span className="inline-flex items-center gap-2">
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" aria-hidden />
+                    取り込み中...
+                  </span>
+                ) : (
+                  '取り込む'
+                )}
               </button>
             </form>
           </div>
 
           <form onSubmit={handleSave} className="space-y-6">
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
+            <div className="bg-pharma-bg-secondary rounded-xl p-6 border border-pharma">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">店舗</label>
+                  <label htmlFor="pharmacy" className="block text-sm font-medium text-pharma-text-secondary mb-1.5">
+                    店舗
+                  </label>
                   <select
+                    id="pharmacy"
                     value={selectedPharmacy}
                     onChange={(e) => setSelectedPharmacy(e.target.value)}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg"
+                    className={inputBase}
                   >
                     <option value="">選択してください</option>
                     {pharmacies.map((p) => (
@@ -170,44 +210,51 @@ export default function InputPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">対象月</label>
+                  <label htmlFor="yearMonth" className="block text-sm font-medium text-pharma-text-secondary mb-1.5">
+                    対象月
+                  </label>
                   <input
+                    id="yearMonth"
                     type="month"
                     value={yearMonth}
                     onChange={(e) => setYearMonth(e.target.value)}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg"
+                    className={inputBase}
                   />
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
-              <h2 className="text-lg font-semibold text-slate-800 mb-4">月次実績</h2>
+            <div className="bg-pharma-bg-secondary rounded-xl p-6 border border-pharma">
+              <h2 className="text-lg font-semibold text-pharma-text-primary mb-4">月次実績</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {items.map((item) => (
                   <div key={item.code}>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                    <label htmlFor={`item-${item.code}`} className="block text-sm font-medium text-pharma-text-secondary mb-1.5">
                       {item.name} ({item.unit})
                     </label>
                     <input
+                      id={`item-${item.code}`}
                       type="number"
                       min="0"
                       step="0.01"
                       value={values[item.code] ?? ''}
                       onChange={(e) => setValues((v) => ({ ...v, [item.code]: e.target.value }))}
-                      className="w-full px-4 py-2 border border-slate-300 rounded-lg"
+                      className={inputBase}
                     />
                   </div>
                 ))}
               </div>
             </div>
 
-            <button
-              type="submit"
-              disabled={saving || !selectedPharmacy}
-              className="px-6 py-3 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50"
-            >
-              {saving ? '保存中...' : '保存'}
+            <button type="submit" disabled={saving || !selectedPharmacy} className={btnPrimary}>
+              {saving ? (
+                <span className="inline-flex items-center gap-2">
+                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" aria-hidden />
+                  保存中...
+                </span>
+              ) : (
+                '保存'
+              )}
             </button>
           </form>
         </>

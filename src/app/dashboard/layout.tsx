@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { signOut } from '@/app/actions/auth'
+import { DashboardNav } from '@/components/DashboardNav'
 
 export default async function DashboardLayout({
   children,
@@ -16,18 +17,21 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="bg-white border-b border-slate-200 px-6 py-4">
+    <div className="min-h-screen bg-pharma-bg-primary">
+      <header className="bg-pharma-bg-secondary border-b border-pharma px-6 py-4 sticky top-0 z-[100]">
         <div className="flex items-center justify-between max-w-7xl mx-auto">
-          <Link href="/dashboard" className="text-xl font-bold text-emerald-700">
+          <Link
+            href="/dashboard"
+            className="text-xl font-heading font-bold text-pharma-accent hover:text-pharma-accent-secondary transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-pharma-focus focus-visible:outline-offset-2 focus-visible:rounded"
+          >
             PharmaNavi
           </Link>
           <div className="flex items-center gap-4">
-            <span className="text-sm text-slate-600">{user.email}</span>
+            <span className="text-sm text-pharma-text-muted">{user.email}</span>
             <form action={signOut}>
               <button
                 type="submit"
-                className="text-sm text-slate-600 hover:text-slate-900"
+                className="text-sm px-3 py-2 rounded-lg text-pharma-text-secondary hover:text-pharma-text-primary hover:bg-pharma-bg-tertiary transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-pharma-focus focus-visible:outline-offset-2"
               >
                 ログアウト
               </button>
@@ -36,34 +40,7 @@ export default async function DashboardLayout({
         </div>
       </header>
 
-      <nav className="bg-white border-b border-slate-200 px-6">
-        <div className="max-w-7xl mx-auto flex gap-8 py-3">
-          <Link
-            href="/dashboard"
-            className="text-sm font-medium text-emerald-700 hover:text-emerald-800"
-          >
-            ダッシュボード
-          </Link>
-          <Link
-            href="/dashboard/roadmap"
-            className="text-sm font-medium text-slate-600 hover:text-slate-900"
-          >
-            加算ロードマップ
-          </Link>
-          <Link
-            href="/dashboard/input"
-            className="text-sm font-medium text-slate-600 hover:text-slate-900"
-          >
-            データ入力
-          </Link>
-          <Link
-            href="/dashboard/settings"
-            className="text-sm font-medium text-slate-600 hover:text-slate-900"
-          >
-            設定
-          </Link>
-        </div>
-      </nav>
+      <DashboardNav />
 
       <main className="max-w-7xl mx-auto px-6 py-8">{children}</main>
     </div>

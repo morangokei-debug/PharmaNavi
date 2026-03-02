@@ -1,27 +1,69 @@
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@300;400;500;600&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  /* Dark UI Kit — Design Tokens */
+  --bg-primary: #1a2035;
+  --bg-secondary: #242f4b;
+  --bg-tertiary: #2d3a56;
+  --bg-overlay: rgba(0, 0, 0, 0.6);
+  --accent-primary: #00bcd4;
+  --accent-secondary: #0097a7;
+  --accent-glow: rgba(0, 188, 212, 0.3);
+  --border-active: rgba(0, 188, 212, 0.5);
+  --text-primary: #ffffff;
+  --text-secondary: #a0aec0;
+  --text-muted: #718096;
+  --color-success: #48bb78;
+  --color-error: #fc8181;
+  --color-warning: #f6ad55;
+  --border-color: rgba(255, 255, 255, 0.08);
+  --border-focus: #00bcd4;
+  --transition-fast: 0.15s ease;
+  --transition-base: 0.2s ease;
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'Inter', sans-serif;
 }
 
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
+@layer components {
+  .font-heading {
+    font-family: 'Rajdhani', sans-serif;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--bg-tertiary) 25%,
+    var(--bg-secondary) 50%,
+    var(--bg-tertiary) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
   }
 }

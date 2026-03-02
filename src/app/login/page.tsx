@@ -30,18 +30,18 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50">
-      <div className="w-full max-w-md p-8 bg-white rounded-xl shadow-lg">
-        <h1 className="text-2xl font-bold text-center text-slate-800 mb-6">
+    <div className="min-h-screen flex items-center justify-center bg-pharma-bg-primary">
+      <div className="w-full max-w-md p-8 bg-pharma-bg-secondary border border-pharma rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
+        <h1 className="text-2xl font-heading font-bold text-center text-pharma-text-primary mb-2">
           PharmaNavi
         </h1>
-        <p className="text-center text-slate-600 mb-8 text-sm">
+        <p className="text-center text-pharma-text-muted text-sm mb-8">
           調剤薬局コンサルシステム
         </p>
 
-        <form onSubmit={handleLogin} className="space-y-4">
+        <form onSubmit={handleLogin} className="space-y-5">
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-1">
+            <label htmlFor="email" className="block text-sm font-medium text-pharma-text-secondary mb-1.5">
               メールアドレス
             </label>
             <input
@@ -50,13 +50,14 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              className="w-full px-4 py-3 bg-pharma-bg-tertiary border border-pharma rounded-lg text-pharma-text-primary placeholder-pharma-muted transition-[border-color,box-shadow] duration-200 focus:outline-none focus:border-pharma-focus focus:ring-[3px] focus:ring-[var(--accent-glow)] focus:ring-offset-0 disabled:opacity-40 disabled:cursor-not-allowed"
               placeholder="example@pharmacy.jp"
+              autoComplete="email"
             />
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-1">
+            <label htmlFor="password" className="block text-sm font-medium text-pharma-text-secondary mb-1.5">
               パスワード
             </label>
             <input
@@ -65,20 +66,34 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              className="w-full px-4 py-3 bg-pharma-bg-tertiary border border-pharma rounded-lg text-pharma-text-primary placeholder-pharma-muted transition-[border-color,box-shadow] duration-200 focus:outline-none focus:border-pharma-focus focus:ring-[3px] focus:ring-[var(--accent-glow)] focus:ring-offset-0 disabled:opacity-40 disabled:cursor-not-allowed"
+              autoComplete="current-password"
             />
           </div>
 
           {error && (
-            <p className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">{error}</p>
+            <div
+              role="alert"
+              className="flex items-center gap-2 text-sm text-pharma-error bg-pharma-bg-tertiary border border-pharma-error/50 p-3 rounded-lg"
+            >
+              <span aria-hidden>⚠</span>
+              {error}
+            </div>
           )}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="w-full min-h-[40px] py-3 px-6 bg-pharma-accent text-white font-semibold rounded-lg shadow-glow transition-all duration-200 hover:bg-pharma-accent-secondary hover:shadow-glow-lg active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-pharma-focus focus-visible:outline-offset-3"
           >
-            {loading ? 'ログイン中...' : 'ログイン'}
+            {loading ? (
+              <span className="inline-flex items-center justify-center gap-2">
+                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" aria-hidden />
+                ログイン中...
+              </span>
+            ) : (
+              'ログイン'
+            )}
           </button>
         </form>
       </div>

@@ -48,38 +48,38 @@ export default async function DashboardPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-slate-800 mb-6">ダッシュボード</h1>
+      <h1 className="text-2xl font-heading font-bold text-pharma-text-primary mb-6">ダッシュボード</h1>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
-          <p className="text-sm text-slate-600 mb-1">算定済み加算数</p>
-          <p className="text-3xl font-bold text-emerald-600">{achievedCount}</p>
+        <div className="bg-pharma-bg-secondary border border-pharma rounded-xl p-6">
+          <p className="text-sm text-pharma-text-muted mb-1">算定済み加算数</p>
+          <p className="text-3xl font-heading font-bold text-pharma-accent">{achievedCount}</p>
         </div>
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
-          <p className="text-sm text-slate-600 mb-1">達成率</p>
-          <p className="text-3xl font-bold text-slate-800">{achievementRate}%</p>
+        <div className="bg-pharma-bg-secondary border border-pharma rounded-xl p-6">
+          <p className="text-sm text-pharma-text-muted mb-1">達成率</p>
+          <p className="text-3xl font-heading font-bold text-pharma-text-primary">{achievementRate}%</p>
         </div>
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
-          <p className="text-sm text-slate-600 mb-1">未達加算数</p>
-          <p className="text-3xl font-bold text-amber-600">{pendingCount}</p>
+        <div className="bg-pharma-bg-secondary border border-pharma rounded-xl p-6">
+          <p className="text-sm text-pharma-text-muted mb-1">未達加算数</p>
+          <p className="text-3xl font-heading font-bold text-pharma-warning">{pendingCount}</p>
         </div>
       </div>
 
-      <div className="mt-8 bg-white rounded-xl p-6 shadow-sm border border-slate-200">
-        <h2 className="text-lg font-semibold text-slate-800 mb-4">ようこそ</h2>
+      <div className="mt-8 bg-pharma-bg-secondary border border-pharma rounded-xl p-6">
+        <h2 className="text-lg font-semibold text-pharma-text-primary mb-4">ようこそ</h2>
         {!profile?.organization_id ? (
-          <p className="text-slate-600">
-            <Link href="/dashboard/settings" className="text-emerald-600 underline font-medium">設定</Link>
+          <p className="text-pharma-text-secondary">
+            <Link href="/dashboard/settings" className="text-pharma-accent underline font-medium hover:text-pharma-accent-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-pharma-focus focus-visible:rounded">設定</Link>
             から組織と店舗を作成してください。その後、
-            <Link href="/dashboard/input" className="text-emerald-600 underline font-medium">データ入力</Link>
+            <Link href="/dashboard/input" className="text-pharma-accent underline font-medium hover:text-pharma-accent-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-pharma-focus focus-visible:rounded">データ入力</Link>
             で実績を登録できます。
           </p>
         ) : pharmacyCount === 0 ? (
-          <p className="text-slate-600">
+          <p className="text-pharma-text-secondary">
             設定で店舗を追加してください。店舗を登録すると、データ入力と加算の進捗表示が可能になります。
           </p>
         ) : (
-          <p className="text-slate-600">
+          <p className="text-pharma-text-secondary">
             データ入力で実績を登録すると、加算ロードマップに進捗が反映されます。
           </p>
         )}
