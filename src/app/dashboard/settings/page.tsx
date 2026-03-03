@@ -19,68 +19,105 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
+  const [editingOrgId, setEditingOrgId] = useState<string | null>(null)
+  const [editingPharmacyId, setEditingPharmacyId] = useState<string | null>(null)
+  const [editOrgName, setEditOrgName] = useState('')
+  const [editPharmacyName, setEditPharmacyName] = useState('')
   const supabase = createClient()
   const router = useRouter()
 
   const fetchData = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
+    let { data: { user } } = await supabase.auth.getUser()
+    console.log('[fetchData] user:', user?.id ?? 'null')
+    if (!user) {
+      await new Promise((r) => setTimeout(r, 300))
+      const retry = await supabase.auth.getUser()
+      user = retry.data.user
+      console.log('[fetchData] retry user:', user?.id ?? 'null')
+    }
     if (!user) return
 
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from('pharma_profiles')
       .select('organization_id')
       .eq('id', user.id)
       .single()
+    console.log('[fetchData] profile:', JSON.stringify(profile), 'error:', JSON.stringify(profileError))
 
-    if (profile?.organization_id) {
-      const { data: orgData } = await supabase
-        .from('pharma_organizations')
-        .select('id, name')
-        .eq('id', profile.organization_id)
-      if (orgData?.length) {
-        setOrgs(orgData)
-        setSelectedOrgId(orgData[0].id)
-      }
+    if (!profile?.organization_id) return
 
-      const { data: phData } = await supabase
-        .from('pharma_pharmacies')
-        .select('id, name, organization_id')
-        .eq('organization_id', profile.organization_id)
-      if (phData) {
-        setPharmacies(phData)
-        const phIds = phData.map((p) => p.id)
-        const { data: appData } = await supabase
-          .from('pharma_pharmacy_approvals')
-          .select('pharmacy_id, approval_code, approved_at')
-          .in('pharmacy_id', phIds)
+    const { data: orgData } = await supabase
+      .from('pharma_organizations')
+      .select('id, name')
+      .eq('id', profile.organization_id)
+    if (orgData?.length) {
+      setOrgs(orgData)
+      setSelectedOrgId(orgData[0].id)
+    } else {
+      setOrgs([])
+      setSelectedOrgId('')
+    }
+
+    const { data: phData } = await supabase
+      .from('pharma_pharmacies')
+      .select('id, name, organization_id')
+      .eq('organization_id', profile.organization_id)
+    if (phData) {
+      setPharmacies(phData)
+      const phIds = phData.map((p) => p.id)
+      const { data: appData, error: appError } = await supabase
+        .from('pharma_pharmacy_approvals')
+        .select('pharmacy_id, approval_code, approved_at')
+        .in('pharmacy_id', phIds)
+      if (!appError && appData) {
         const byPh: Record<string, Approval[]> = {}
         phIds.forEach((id) => { byPh[id] = [] })
-        appData?.forEach((a) => {
+        appData.forEach((a) => {
           if (!byPh[a.pharmacy_id]) byPh[a.pharmacy_id] = []
           byPh[a.pharmacy_id].push({ approval_code: a.approval_code, approved_at: a.approved_at })
         })
         setApprovalsByPharmacy(byPh)
       }
+      // 届出テーブルが無い・RLSエラー時は上書きしない（既存の表示を維持）
+    } else {
+      setPharmacies([])
+      setApprovalsByPharmacy({})
     }
   }
 
   useEffect(() => {
+    let cancelled = false
     const load = async () => {
       await fetchData()
-      setLoading(false)
+      if (!cancelled) setLoading(false)
     }
     load()
+
+    // リロード時はセッション復元が遅れることがあるため、認証状態の変化を監視して再取得
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session && !cancelled) fetchData()
+    })
+    return () => {
+      cancelled = true
+      subscription.unsubscribe()
+    }
   }, [])
 
   const createOrg = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!newOrgName.trim()) return
+    console.log('[createOrg] called, newOrgName:', JSON.stringify(newOrgName))
+    if (!newOrgName.trim()) {
+      console.log('[createOrg] empty name, returning')
+      return
+    }
     setSaving(true)
     setMessage(null)
 
+    console.log('[createOrg] calling supabase.rpc...')
     const { data, error } = await supabase.rpc('create_organization', {
       org_name: newOrgName.trim(),
     })
+    console.log('[createOrg] rpc result:', JSON.stringify({ data, error }))
 
     if (error) {
       setMessage('組織の作成に失敗しました: ' + error.message)
@@ -102,10 +139,83 @@ export default function SettingsPage() {
     const createdOrgName = newOrgName.trim()
     setOrgs([{ id: result.id, name: createdOrgName }])
     setSelectedOrgId(result.id)
+    setPharmacies([])
+    setApprovalsByPharmacy({})
     setNewOrgName('')
     setMessage('組織を作成しました')
+    console.log('[createOrg] calling fetchData...')
     await fetchData()
+    console.log('[createOrg] fetchData done, orgs/pharmacies updated')
     router.refresh()
+    setSaving(false)
+  }
+
+  const updateOrg = async (orgId: string, newName: string) => {
+    if (!newName.trim()) return
+    setSaving(true)
+    setMessage(null)
+    const { error } = await supabase.from('pharma_organizations').update({ name: newName.trim() }).eq('id', orgId)
+    if (error) {
+      setMessage('組織の更新に失敗しました: ' + error.message)
+    } else {
+      setOrgs((prev) => prev.map((o) => (o.id === orgId ? { ...o, name: newName.trim() } : o)))
+      setMessage('組織名を更新しました')
+      router.refresh()
+    }
+    setSaving(false)
+  }
+
+  const deleteOrg = async (orgId: string) => {
+    if (!confirm('この組織と配下の店舗・データをすべて削除します。よろしいですか？')) return
+    setSaving(true)
+    setMessage(null)
+    const { error } = await supabase.from('pharma_organizations').delete().eq('id', orgId)
+    if (error) {
+      setMessage('組織の削除に失敗しました: ' + error.message)
+    } else {
+      setOrgs([])
+      setPharmacies([])
+      setSelectedOrgId('')
+      setApprovalsByPharmacy({})
+      setMessage('組織を削除しました')
+      await fetchData()
+      router.refresh()
+    }
+    setSaving(false)
+  }
+
+  const updatePharmacy = async (pharmacyId: string, newName: string) => {
+    if (!newName.trim()) return
+    setSaving(true)
+    setMessage(null)
+    const { error } = await supabase.from('pharma_pharmacies').update({ name: newName.trim() }).eq('id', pharmacyId)
+    if (error) {
+      setMessage('店舗の更新に失敗しました: ' + error.message)
+    } else {
+      setPharmacies((prev) => prev.map((p) => (p.id === pharmacyId ? { ...p, name: newName.trim() } : p)))
+      setMessage('店舗名を更新しました')
+      router.refresh()
+    }
+    setSaving(false)
+  }
+
+  const deletePharmacy = async (pharmacyId: string) => {
+    if (!confirm('この店舗と関連データを削除します。よろしいですか？')) return
+    setSaving(true)
+    setMessage(null)
+    const { error } = await supabase.from('pharma_pharmacies').delete().eq('id', pharmacyId)
+    if (error) {
+      setMessage('店舗の削除に失敗しました: ' + error.message)
+    } else {
+      setPharmacies((prev) => prev.filter((p) => p.id !== pharmacyId))
+      setApprovalsByPharmacy((prev) => {
+        const next = { ...prev }
+        delete next[pharmacyId]
+        return next
+      })
+      setMessage('店舗を削除しました')
+      router.refresh()
+    }
     setSaving(false)
   }
 
@@ -137,6 +247,8 @@ export default function SettingsPage() {
   }
 
   const toggleApproval = async (pharmacyId: string, approvalCode: string, checked: boolean) => {
+    console.log('[toggleApproval]', { pharmacyId, approvalCode, checked })
+    setMessage(null)
     const today = new Date().toISOString().slice(0, 10)
     const { error } = await supabase
       .from('pharma_pharmacy_approvals')
@@ -148,27 +260,29 @@ export default function SettingsPage() {
         },
         { onConflict: 'pharmacy_id,approval_code' }
       )
-    if (!error) {
-      const ym = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
-      await fetch('/api/kasan/recalculate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pharmacy_id: pharmacyId, year_month: ym }),
-      }).catch(() => {})
-      setApprovalsByPharmacy((prev) => {
-        const list = prev[pharmacyId] ?? []
-        const exists = list.find((a) => a.approval_code === approvalCode)
-        let next: Approval[]
-        if (exists) {
-          next = list.map((a) =>
-            a.approval_code === approvalCode ? { ...a, approved_at: checked ? today : null } : a
-          )
-        } else {
-          next = [...list, { approval_code: approvalCode, approved_at: checked ? today : null }]
-        }
-        return { ...prev, [pharmacyId]: next }
-      })
+    if (error) {
+      setMessage('届出の更新に失敗しました: ' + error.message)
+      return
     }
+    const ym = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
+    await fetch('/api/kasan/recalculate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pharmacy_id: pharmacyId, year_month: ym }),
+    }).catch(() => {})
+    setApprovalsByPharmacy((prev) => {
+      const list = prev[pharmacyId] ?? []
+      const exists = list.find((a) => a.approval_code === approvalCode)
+      let next: Approval[]
+      if (exists) {
+        next = list.map((a) =>
+          a.approval_code === approvalCode ? { ...a, approved_at: checked ? today : null } : a
+        )
+      } else {
+        next = [...list, { approval_code: approvalCode, approved_at: checked ? today : null }]
+      }
+      return { ...prev, [pharmacyId]: next }
+    })
   }
 
   const isApproved = (pharmacyId: string, code: string) =>
@@ -189,9 +303,24 @@ export default function SettingsPage() {
     )
   }
 
+  const handleReload = () => {
+    setLoading(true)
+    fetchData().finally(() => setLoading(false))
+  }
+
   return (
     <div>
-      <h1 className="text-2xl font-heading font-bold text-pharma-text-primary mb-6">設定</h1>
+      <div className="flex items-center justify-between gap-4 mb-6">
+        <h1 className="text-2xl font-heading font-bold text-pharma-text-primary">設定</h1>
+        <button
+          type="button"
+          onClick={handleReload}
+          disabled={loading}
+          className="text-sm px-4 py-2 rounded-lg border border-pharma text-pharma-text-secondary hover:bg-pharma-bg-tertiary transition-colors disabled:opacity-50"
+        >
+          データを再読み込み
+        </button>
+      </div>
 
       {message && (
         <div
@@ -209,9 +338,15 @@ export default function SettingsPage() {
       <div className="space-y-8">
         <section className="bg-pharma-bg-secondary rounded-xl p-6 border border-pharma">
           <h2 className="text-lg font-semibold text-pharma-text-primary mb-4">組織の作成</h2>
-          <p className="text-sm text-pharma-text-muted mb-4">
-            まだ組織がない場合、まず組織を作成してください。作成すると自動的にあなたがその組織に紐づきます。
-          </p>
+          {orgs.length > 0 ? (
+            <p className="text-sm text-pharma-success mb-4 font-medium">
+              現在の組織: {orgs.map((o) => o.name).join(', ')}
+            </p>
+          ) : (
+            <p className="text-sm text-pharma-text-muted mb-4">
+              まだ組織がない場合、まず組織を作成してください。作成すると自動的にあなたがその組織に紐づきます。
+            </p>
+          )}
           <form onSubmit={createOrg} className="flex gap-3">
             <input
               type="text"
@@ -230,18 +365,12 @@ export default function SettingsPage() {
         <section className="bg-pharma-bg-secondary rounded-xl p-6 border border-pharma">
           <h2 className="text-lg font-semibold text-pharma-text-primary mb-4">店舗の追加</h2>
           {orgs.length === 0 ? (
-            <div className="space-y-3">
+            <div className="space-y-2">
               <p className="text-pharma-text-muted text-sm">先に組織を作成してください。</p>
               <p className="text-pharma-text-muted text-sm">
-                組織を作成したのに店舗入力欄が表示されない場合は、下のボタンで再読み込みしてください。
+                組織を作成したのに表示されない・リロードで消える場合は、画面上部の「データを再読み込み」をクリックしてください。
+                それでも解決しない場合は <code className="text-xs bg-pharma-bg-tertiary px-1 rounded">docs/TROUBLESHOOTING.md</code> を確認してください。
               </p>
-              <button
-                type="button"
-                onClick={() => { setLoading(true); fetchData().finally(() => setLoading(false)) }}
-                className={`${btnPrimary} text-sm`}
-              >
-                再読み込み
-              </button>
             </div>
           ) : (
             <>
@@ -295,6 +424,149 @@ export default function SettingsPage() {
           )}
         </section>
 
+        <section className="bg-pharma-bg-secondary rounded-xl p-6 border border-pharma">
+          <h2 className="text-lg font-semibold text-pharma-text-primary mb-4">組織・店舗一覧</h2>
+          <p className="text-sm text-pharma-text-muted mb-4">
+            登録済みの組織と店舗を確認・編集・削除できます。
+          </p>
+          {orgs.length === 0 ? (
+            <p className="text-pharma-text-muted text-sm">組織が登録されていません。上で組織を作成してください。</p>
+          ) : (
+            <div className="space-y-6">
+              {orgs.map((org) => (
+                <div key={org.id} className="border border-pharma rounded-lg p-4 bg-pharma-bg-tertiary/50">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    {editingOrgId === org.id ? (
+                      <>
+                        <input
+                          type="text"
+                          value={editOrgName}
+                          onChange={(e) => setEditOrgName(e.target.value)}
+                          className={`flex-1 min-w-[200px] ${inputBase}`}
+                          autoFocus
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            updateOrg(org.id, editOrgName)
+                            setEditingOrgId(null)
+                          }}
+                          disabled={saving}
+                          className={btnPrimary}
+                        >
+                          保存
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingOrgId(null)
+                            setEditOrgName('')
+                          }}
+                          className="px-4 py-2 text-pharma-text-muted hover:text-pharma-text-primary"
+                        >
+                          キャンセル
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <span className="font-medium text-pharma-text-primary">{org.name}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingOrgId(org.id)
+                            setEditOrgName(org.name)
+                          }}
+                          disabled={saving}
+                          className="text-sm text-pharma-accent hover:underline"
+                        >
+                          編集
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteOrg(org.id)}
+                          disabled={saving}
+                          className="text-sm text-pharma-error hover:underline"
+                        >
+                          削除
+                        </button>
+                      </>
+                    )}
+                  </div>
+                  <ul className="mt-3 ml-4 space-y-2">
+                    {pharmacies.filter((p) => p.organization_id === org.id).length === 0 ? (
+                      <li className="text-sm text-pharma-text-muted">店舗がありません。上の「店舗の追加」で追加できます。</li>
+                    ) : (
+                    <>
+                    {pharmacies
+                      .filter((p) => p.organization_id === org.id)
+                      .map((ph) => (
+                        <li key={ph.id} className="flex items-center gap-3 flex-wrap">
+                          {editingPharmacyId === ph.id ? (
+                            <>
+                              <input
+                                type="text"
+                                value={editPharmacyName}
+                                onChange={(e) => setEditPharmacyName(e.target.value)}
+                                className={`flex-1 min-w-[180px] ${inputBase} text-sm`}
+                                autoFocus
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  updatePharmacy(ph.id, editPharmacyName)
+                                  setEditingPharmacyId(null)
+                                }}
+                                disabled={saving}
+                                className={`${btnPrimary} text-sm`}
+                              >
+                                保存
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingPharmacyId(null)
+                                  setEditPharmacyName('')
+                                }}
+                                className="text-sm text-pharma-text-muted hover:text-pharma-text-primary"
+                              >
+                                キャンセル
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <span className="text-pharma-text-secondary">・{ph.name}</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingPharmacyId(ph.id)
+                                  setEditPharmacyName(ph.name)
+                                }}
+                                disabled={saving}
+                                className="text-xs text-pharma-accent hover:underline"
+                              >
+                                編集
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => deletePharmacy(ph.id)}
+                                disabled={saving}
+                                className="text-xs text-pharma-error hover:underline"
+                              >
+                                削除
+                              </button>
+                            </>
+                          )}
+                        </li>
+                      ))}
+                    </>
+                    )}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
         {pharmacies.length > 0 && (
           <section className="bg-pharma-bg-secondary rounded-xl p-6 border border-pharma">
             <h2 className="text-lg font-semibold text-pharma-text-primary mb-4">届出管理</h2>
@@ -307,14 +579,21 @@ export default function SettingsPage() {
                   <p className="font-medium text-pharma-text-primary mb-3">{ph.name}</p>
                   <div className="flex flex-wrap gap-4">
                     {APPROVAL_MASTER.map((a) => (
-                      <label key={a.code} className="flex items-center gap-2 cursor-pointer min-h-[44px]">
+                      <label
+                        key={a.code}
+                        className="flex items-start gap-2 cursor-pointer min-h-[44px]"
+                        title={a.note}
+                      >
                         <input
                           type="checkbox"
                           checked={isApproved(ph.id, a.code)}
                           onChange={(e) => toggleApproval(ph.id, a.code, e.target.checked)}
-                          className="w-5 h-5 rounded border-pharma bg-pharma-bg-tertiary text-pharma-accent focus:ring-pharma-focus focus:ring-2"
+                          className="mt-0.5 w-5 h-5 rounded border-pharma bg-pharma-bg-tertiary text-pharma-accent focus:ring-pharma-focus focus:ring-2"
                         />
-                        <span className="text-sm text-pharma-text-secondary">{a.name}</span>
+                        <span className="text-sm text-pharma-text-secondary">
+                          {a.name}
+                          {a.note && <span className="block text-xs text-pharma-text-muted mt-0.5">{a.note}</span>}
+                        </span>
                       </label>
                     ))}
                   </div>

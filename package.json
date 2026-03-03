@@ -9,6 +9,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "preview": "npm run build && next start -p 3005",
     "lint": "next lint"
   },
   "dependencies": {

@@ -36,7 +36,8 @@ BEGIN
 END;
 $$;
 
--- 3. ポリシーを再帰しない形に更新
+-- 3. ポリシーを再帰しない形に更新（古い自己参照ポリシーも削除）
+DROP POLICY IF EXISTS "profile_select" ON pharma_profiles;
 DROP POLICY IF EXISTS "pharma_profile_select" ON pharma_profiles;
 CREATE POLICY "pharma_profile_select" ON pharma_profiles FOR SELECT
   USING (id = auth.uid() OR organization_id = get_my_organization_id());
