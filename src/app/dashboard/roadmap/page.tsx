@@ -63,6 +63,18 @@ type MonthlyRecord = {
 
 const STORAGE_KEY = 'pharmanavi-roadmap-pharmacy'
 
+/** 調剤基本料区分に応じて算定可能な地域支援加算のみに絞る */
+function filterKasanByChozai(list: KasanMaster[], chozai: number): KasanMaster[] {
+  return list.filter((k) => {
+    if (k.code.startsWith('chiiki_iryo_')) {
+      if (k.code === 'chiiki_iryo_1') return true
+      if (k.code === 'chiiki_iryo_2' || k.code === 'chiiki_iryo_3') return chozai === 1
+      if (k.code === 'chiiki_iryo_4' || k.code === 'chiiki_iryo_5') return chozai === 2 || chozai === 3
+    }
+    return true
+  })
+}
+
 export default function RoadmapPage() {
   const supabase = createClient()
   const past12Months = useMemo(() => getPast12Months(), [])
@@ -184,6 +196,11 @@ export default function RoadmapPage() {
     else if (chozaiKihon === 2 || chozaiKihon === 3) list.push({ approval_code: 'chozai_23' })
     return list
   }, [approvals, chozaiKihon])
+
+  const displayKasanList = useMemo(
+    () => filterKasanByChozai(kasanList, chozaiKihon),
+    [kasanList, chozaiKihon]
+  )
 
   function getMonthValue(metricCode: string, ym: string): number {
     return monthlyRecords
@@ -329,14 +346,25 @@ export default function RoadmapPage() {
         )}
       </div>
 
-      {kasanList.length === 0 ? (
+      {displayKasanList.length === 0 ? (
         <div className="bg-pharma-bg-secondary rounded-xl p-12 text-center">
-          <p className="text-pharma-text-muted text-lg mb-2">加算マスタが登録されていません</p>
-          <p className="text-pharma-text-muted text-sm">SQL Editorでシードデータを投入してください。</p>
+          {kasanList.length === 0 ? (
+            <>
+              <p className="text-pharma-text-muted text-lg mb-2">加算マスタが登録されていません</p>
+              <p className="text-pharma-text-muted text-sm">SQL Editorでシードデータを投入してください。</p>
+            </>
+          ) : (
+            <>
+              <p className="text-pharma-text-muted text-lg mb-2">表示する加算がありません</p>
+              <p className="text-pharma-text-muted text-sm">
+                <Link href="/dashboard/settings" className="text-pharma-accent underline">設定</Link>で店舗の調剤基本料区分（1・2・3）を確認してください。
+              </p>
+            </>
+          )}
         </div>
       ) : (
         <div className="space-y-6">
-          {kasanList.map((kasan) => {
+          {displayKasanList.map((kasan) => {
             const currentStatus = statusMap[kasan.id]?.[currentMonth]?.status
             const badge = getStatusBadge(currentStatus)
             const achievedCount = getAchievedCount(kasan.id)
