@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
       const { data: kasanList } = await supabase
         .from('pharma_kasan_master')
         .select('id, name, code, points, requirements_json')
-        .eq('revision_year', 2024)
+        .eq('revision_year', 2026)
         .order('code')
 
       if (pharmacies?.length && kasanList?.length) {

@@ -45,6 +45,23 @@ export const COLUMN_TO_ITEM: Record<string, string> = {
   '時間外対応': 'jikangai_count',
   '休日対応': 'jikangai_count',
   jikangai_count: 'jikangai_count',
+  // 2026年改定追加項目
+  '調剤時残薬調整加算': 'zanryaku_yugai_count',
+  '薬学的有害事象等防止加算': 'zanryaku_yugai_count',
+  '残薬調整・有害事象': 'zanryaku_yugai_count',
+  zanryaku_yugai_count: 'zanryaku_yugai_count',
+  '外来服薬支援料': 'gairai_fukuyaku_count',
+  gairai_fukuyaku_count: 'gairai_fukuyaku_count',
+  '服薬情報等提供料': 'fukuyaku_info_count',
+  fukuyaku_info_count: 'fukuyaku_info_count',
+  '小児特定加算': 'shouni_tokutei_count',
+  shouni_tokutei_count: 'shouni_tokutei_count',
+  '後発医薬品調剤割合': 'kohatsu_ratio',
+  '後発調剤割合': 'kohatsu_ratio',
+  kohatsu_ratio: 'kohatsu_ratio',
+  '在宅個人宅': 'zaitaku_visit_kojinka',
+  '個人宅訪問': 'zaitaku_visit_kojinka',
+  zaitaku_visit_kojinka: 'zaitaku_visit_kojinka',
 }
 
 /** マッピング対象外の列（日付・患者名など個人情報） */
@@ -54,4 +71,4 @@ export const IGNORE_COLUMNS = new Set([
 ])
 
 /** 合算ではなく平均を取る項目（割合など） */
-export const AVERAGE_ITEMS = new Set(['mynumber_confirm_pct'])
+export const AVERAGE_ITEMS = new Set(['mynumber_confirm_pct', 'kohatsu_ratio'])

@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { APPROVAL_MASTER } from '@/lib/approval-master'
 
 type Organization = { id: string; name: string }
-type Pharmacy = { id: string; name: string; organization_id: string }
+type Pharmacy = { id: string; name: string; organization_id: string; chozai_kihon?: number }
 type Approval = { approval_code: string; approved_at: string | null }
 
 export default function SettingsPage() {
@@ -60,7 +60,7 @@ export default function SettingsPage() {
 
     const { data: phData } = await supabase
       .from('pharma_pharmacies')
-      .select('id, name, organization_id')
+      .select('id, name, organization_id, chozai_kihon')
       .eq('organization_id', profile.organization_id)
     if (phData) {
       setPharmacies(phData)
@@ -194,6 +194,26 @@ export default function SettingsPage() {
     } else {
       setPharmacies((prev) => prev.map((p) => (p.id === pharmacyId ? { ...p, name: newName.trim() } : p)))
       setMessage('店舗名を更新しました')
+      router.refresh()
+    }
+    setSaving(false)
+  }
+
+  const updateChozaiKihon = async (pharmacyId: string, value: number) => {
+    setSaving(true)
+    setMessage(null)
+    const { error } = await supabase.from('pharma_pharmacies').update({ chozai_kihon: value }).eq('id', pharmacyId)
+    if (error) {
+      setMessage('調剤基本料区分の更新に失敗しました: ' + error.message)
+    } else {
+      setPharmacies((prev) => prev.map((p) => (p.id === pharmacyId ? { ...p, chozai_kihon: value } : p)))
+      setMessage('調剤基本料区分を更新しました')
+      const ym = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
+      await fetch('/api/kasan/recalculate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pharmacy_id: pharmacyId, year_month: ym }),
+      }).catch(() => {})
       router.refresh()
     }
     setSaving(false)
@@ -577,6 +597,19 @@ export default function SettingsPage() {
               {pharmacies.map((ph) => (
                 <div key={ph.id} className="border border-pharma rounded-lg p-4 bg-pharma-bg-tertiary/50">
                   <p className="font-medium text-pharma-text-primary mb-3">{ph.name}</p>
+                  <div className="mb-4">
+                    <label className="block text-sm text-pharma-text-secondary mb-1">調剤基本料区分（2026年改定）</label>
+                    <select
+                      value={ph.chozai_kihon ?? 1}
+                      onChange={(e) => updateChozaiKihon(ph.id, Number(e.target.value))}
+                      disabled={saving}
+                      className={`${inputBase} max-w-[200px]`}
+                    >
+                      <option value={1}>調剤基本料１</option>
+                      <option value={2}>調剤基本料２</option>
+                      <option value={3}>調剤基本料３</option>
+                    </select>
+                  </div>
                   <div className="flex flex-wrap gap-4">
                     {APPROVAL_MASTER.map((a) => (
                       <label

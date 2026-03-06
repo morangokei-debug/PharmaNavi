@@ -30,7 +30,7 @@ export default async function DashboardPage() {
     const { data: kasanList } = await supabase
       .from('pharma_kasan_master')
       .select('id')
-      .eq('revision_year', 2024)
+      .eq('revision_year', 2026)
     totalCount = kasanList?.length ?? 0
 
     if (pharmacies?.length && kasanList?.length) {

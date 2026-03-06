@@ -1,6 +1,6 @@
-/** 届出コードと表示名のマスタ（加算のapproval条件と対応） */
+/** 届出コードと表示名のマスタ（加算のapproval条件と対応）2026年改定版 */
 export const APPROVAL_MASTER: { code: string; name: string; note?: string }[] = [
-  { code: 'junkai', name: '地域支援体制加算1用 届出済み', note: '地域支援体制加算1（39点）の前提' },
-  { code: 'jizai', name: '在宅届出', note: '地域支援体制加算1の前提' },
-  { code: 'chiiki_junkai', name: '連携強化加算用 地域支援体制届出', note: '連携強化加算（5点）の3条件の1つ' },
+  { code: 'junkai_chiiki_iryo', name: '地域支援・医薬品供給対応体制加算の届出', note: '加算１の前提' },
+  { code: 'zaitaku_junkai', name: '在宅患者訪問薬剤管理指導の届出', note: '在宅薬学総合体制加算の前提' },
+  { code: 'zaitaku_sogo_1', name: '在宅薬学総合体制加算１の施設基準を満たす', note: '加算２の前提（加算１達成後）' },
 ]

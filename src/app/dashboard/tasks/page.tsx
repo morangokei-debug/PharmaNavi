@@ -58,7 +58,7 @@ export default function TasksPage() {
       const { data: kasan } = await supabase
         .from('pharma_kasan_master')
         .select('id, name, code')
-        .eq('revision_year', 2024)
+        .eq('revision_year', 2026)
         .order('code')
       if (kasan) setKasanList(kasan)
       await loadTasks()

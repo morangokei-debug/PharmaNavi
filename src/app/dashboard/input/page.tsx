@@ -1,8 +1,21 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
+
+/** 直近12ヶ月の年月リスト（古い順） */
+function getPast12Months(): string[] {
+  const now = new Date()
+  const months: string[] = []
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    months.push(
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    )
+  }
+  return months
+}
 
 type Pharmacy = { id: string; name: string }
 type Item = { code: string; name: string; unit: string }
@@ -14,19 +27,30 @@ type ImportLog = {
   pharmacy_name: string
 }
 
+const STORAGE_KEY = 'pharmanavi-input-pharmacy'
+
 export default function InputPage() {
   const [pharmacies, setPharmacies] = useState<Pharmacy[]>([])
   const [items, setItems] = useState<Item[]>([])
-  const [selectedPharmacy, setSelectedPharmacy] = useState('')
-  const [yearMonth, setYearMonth] = useState('')
-  const [values, setValues] = useState<Record<string, string>>({})
+  const [selectedPharmacy, setSelectedPharmacyRaw] = useState('')
+  const [values, setValues] = useState<Record<string, Record<string, string>>>({})
+
+  const setSelectedPharmacy = (id: string) => {
+    setSelectedPharmacyRaw(id)
+    if (typeof window !== 'undefined') {
+      try { localStorage.setItem(STORAGE_KEY, id) } catch {}
+    }
+  }
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [csvFile, setCsvFile] = useState<File | null>(null)
+  const [csvImportTargetMonth, setCsvImportTargetMonth] = useState('')
   const [csvImporting, setCsvImporting] = useState(false)
   const [importLogs, setImportLogs] = useState<ImportLog[]>([])
   const supabase = createClient()
+
+  const past12Months = useMemo(() => getPast12Months(), [])
 
   useEffect(() => {
     const load = async () => {
@@ -34,7 +58,17 @@ export default function InputPage() {
         .from('pharma_pharmacies')
         .select('id, name')
         .order('name')
-      if (phData) setPharmacies(phData)
+      if (phData) {
+        setPharmacies(phData)
+        if (typeof window !== 'undefined') {
+          try {
+            const saved = localStorage.getItem(STORAGE_KEY)
+            if (saved && phData.some((p) => p.id === saved)) {
+              setSelectedPharmacyRaw(saved)
+            }
+          } catch {}
+        }
+      }
 
       const { data: itemData } = await supabase
         .from('pharma_item_master')
@@ -43,7 +77,8 @@ export default function InputPage() {
       if (itemData) setItems(itemData)
 
       const now = new Date()
-      setYearMonth(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`)
+      const currentYm = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+      setCsvImportTargetMonth(currentYm)
 
       if (phData?.length) {
         const phIds = phData.map((p) => p.id)
@@ -71,69 +106,85 @@ export default function InputPage() {
   }, [])
 
   useEffect(() => {
-    if (!selectedPharmacy || !yearMonth) return
+    if (!selectedPharmacy || past12Months.length === 0) return
     const load = async () => {
       const { data } = await supabase
         .from('pharma_monthly_records')
-        .select('item_code, value')
+        .select('year_month, item_code, value')
         .eq('pharmacy_id', selectedPharmacy)
-        .eq('year_month', yearMonth)
-      const v: Record<string, string> = {}
-      data?.forEach((r) => { v[r.item_code] = String(r.value) })
+        .in('year_month', past12Months)
+      const v: Record<string, Record<string, string>> = {}
+      past12Months.forEach((ym) => { v[ym] = {} })
+      data?.forEach((r) => {
+        if (!v[r.year_month]) v[r.year_month] = {}
+        v[r.year_month][r.item_code] = String(r.value)
+      })
       setValues(v)
     }
     load()
-  }, [selectedPharmacy, yearMonth])
+  }, [selectedPharmacy, past12Months])
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!selectedPharmacy || !yearMonth) return
+    if (!selectedPharmacy) return
     setSaving(true)
     setMessage(null)
 
-    for (const item of items) {
-      const val = values[item.code]?.trim()
-      const num = val ? parseFloat(val) : 0
-      const { error } = await supabase
-        .from('pharma_monthly_records')
-        .upsert(
-          { pharmacy_id: selectedPharmacy, year_month: yearMonth, item_code: item.code, value: num },
-          { onConflict: 'pharmacy_id,year_month,item_code' }
-        )
-      if (error) {
-        setMessage('保存に失敗しました: ' + error.message)
-        setSaving(false)
-        return
+    for (const ym of past12Months) {
+      for (const item of items) {
+        const val = values[ym]?.[item.code]?.trim()
+        const num = val ? parseFloat(val) : 0
+        const { error } = await supabase
+          .from('pharma_monthly_records')
+          .upsert(
+            { pharmacy_id: selectedPharmacy, year_month: ym, item_code: item.code, value: num },
+            { onConflict: 'pharmacy_id,year_month,item_code' }
+          )
+        if (error) {
+          setMessage('保存に失敗しました: ' + error.message)
+          setSaving(false)
+          return
+        }
       }
     }
-    await fetch('/api/kasan/recalculate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pharmacy_id: selectedPharmacy, year_month: yearMonth }),
-    }).catch(() => {})
-    setMessage('保存しました')
+    for (const ym of past12Months) {
+      await fetch('/api/kasan/recalculate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pharmacy_id: selectedPharmacy, year_month: ym }),
+      }).catch(() => {})
+    }
+    setMessage('保存しました（過去12ヶ月分）')
     setSaving(false)
   }
 
   const handleCsvImport = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!csvFile || !selectedPharmacy || !yearMonth) return
+    if (!csvFile || !selectedPharmacy || !csvImportTargetMonth) return
     setCsvImporting(true)
     setMessage(null)
     const fd = new FormData()
     fd.append('file', csvFile)
     fd.append('pharmacy_id', selectedPharmacy)
-    fd.append('year_month', yearMonth)
+    fd.append('year_month', csvImportTargetMonth)
     const res = await fetch('/api/import/csv', { method: 'POST', body: fd })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) {
       setMessage('取り込み失敗: ' + (data.error ?? 'エラー'))
     } else {
-      setMessage(`CSV取り込み完了（${data.imported}項目）`)
+      setMessage(`${csvImportTargetMonth} のCSV取り込み完了（${data.imported}項目）`)
       setCsvFile(null)
       const v: Record<string, string> = {}
       data.items?.forEach((r: { code: string; value: number }) => { v[r.code] = String(r.value) })
-      setValues((prev) => ({ ...prev, ...v }))
+      setValues((prev) => ({
+        ...prev,
+        [csvImportTargetMonth]: { ...(prev[csvImportTargetMonth] ?? {}), ...v },
+      }))
+      await fetch('/api/kasan/recalculate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pharmacy_id: selectedPharmacy, year_month: csvImportTargetMonth }),
+      }).catch(() => {})
       setImportLogs((prev) => [{
         id: crypto.randomUUID(),
         file_name: csvFile?.name ?? '',
@@ -194,9 +245,26 @@ export default function InputPage() {
           <div className="mb-6 bg-pharma-bg-secondary rounded-xl p-6 border border-pharma">
             <h2 className="text-lg font-semibold text-pharma-text-primary mb-3">CSV取り込み</h2>
             <p className="text-sm text-pharma-text-muted mb-3">
-              ReceptyなどレセコンのCSVをアップロードすると、列名から自動でマッピングして月次実績に取り込みます。
+              ReceptyなどレセコンのCSVをアップロードすると、列名から自動でマッピングして月次実績に取り込みます。取り込み先の月を選んでください。
             </p>
             <form onSubmit={handleCsvImport} className="flex flex-wrap items-end gap-3">
+              <div className="min-w-[140px]">
+                <label htmlFor="csv-target-month" className="block text-sm font-medium text-pharma-text-secondary mb-1.5">
+                  取り込み先の月
+                </label>
+                <select
+                  id="csv-target-month"
+                  value={csvImportTargetMonth}
+                  onChange={(e) => setCsvImportTargetMonth(e.target.value)}
+                  className={inputBase}
+                >
+                  {past12Months.map((ym) => (
+                    <option key={ym} value={ym}>
+                      {ym.replace('-', '年')}月
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div className="flex-1 min-w-[200px]">
                 <label htmlFor="csv-file" className="block text-sm font-medium text-pharma-text-secondary mb-1.5">
                   CSVファイル
@@ -260,58 +328,56 @@ export default function InputPage() {
 
           <form onSubmit={handleSave} className="space-y-6">
             <div className="bg-pharma-bg-secondary rounded-xl p-6 border border-pharma">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="pharmacy" className="block text-sm font-medium text-pharma-text-secondary mb-1.5">
-                    店舗
-                  </label>
+              <div>
+                <label htmlFor="pharmacy" className="block text-sm font-medium text-pharma-text-secondary mb-1.5">
+                  店舗
+                </label>
                   <select
                     id="pharmacy"
                     value={selectedPharmacy}
                     onChange={(e) => setSelectedPharmacy(e.target.value)}
-                    className={inputBase}
-                  >
-                    <option value="">選択してください</option>
-                    {pharmacies.map((p) => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label htmlFor="yearMonth" className="block text-sm font-medium text-pharma-text-secondary mb-1.5">
-                    対象月
-                  </label>
-                  <input
-                    id="yearMonth"
-                    type="month"
-                    value={yearMonth}
-                    onChange={(e) => setYearMonth(e.target.value)}
-                    className={inputBase}
-                  />
-                </div>
+                  className={inputBase}
+                >
+                  <option value="">選択してください</option>
+                  {pharmacies.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
               </div>
+              <p className="text-sm text-pharma-text-muted mt-2">
+                過去12ヶ月分の実績を一括で入力・編集できます。既に入力済みのデータはそのまま残ります。
+              </p>
             </div>
 
-            <div className="bg-pharma-bg-secondary rounded-xl p-6 border border-pharma">
-              <h2 className="text-lg font-semibold text-pharma-text-primary mb-4">月次実績</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {items.map((item) => (
-                  <div key={item.code}>
-                    <label htmlFor={`item-${item.code}`} className="block text-sm font-medium text-pharma-text-secondary mb-1.5">
-                      {item.name} ({item.unit})
-                    </label>
-                    <input
-                      id={`item-${item.code}`}
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={values[item.code] ?? ''}
-                      onChange={(e) => setValues((v) => ({ ...v, [item.code]: e.target.value }))}
-                      className={inputBase}
-                    />
+            <div className="space-y-4">
+              {past12Months.map((ym) => (
+                <div key={ym} className="bg-pharma-bg-secondary rounded-xl p-6 border border-pharma">
+                  <h2 className="text-lg font-semibold text-pharma-text-primary mb-4">
+                    {ym.replace('-', '年')}月
+                  </h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {items.map((item) => (
+                      <div key={`${ym}-${item.code}`}>
+                        <label htmlFor={`item-${ym}-${item.code}`} className="block text-sm font-medium text-pharma-text-secondary mb-1.5">
+                          {item.name} ({item.unit})
+                        </label>
+                        <input
+                          id={`item-${ym}-${item.code}`}
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={values[ym]?.[item.code] ?? ''}
+                          onChange={(e) => setValues((v) => ({
+                            ...v,
+                            [ym]: { ...(v[ym] ?? {}), [item.code]: e.target.value },
+                          }))}
+                          className={inputBase}
+                        />
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
 
             <button type="submit" disabled={saving || !selectedPharmacy} className={btnPrimary}>
