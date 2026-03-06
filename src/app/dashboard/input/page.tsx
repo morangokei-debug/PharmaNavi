@@ -48,9 +48,18 @@ export default function InputPage() {
   const [csvImportTargetMonth, setCsvImportTargetMonth] = useState('')
   const [csvImporting, setCsvImporting] = useState(false)
   const [importLogs, setImportLogs] = useState<ImportLog[]>([])
+  const [activeMonth, setActiveMonth] = useState('')
   const supabase = createClient()
 
   const past12Months = useMemo(() => getPast12Months(), [])
+
+  useEffect(() => {
+    if (past12Months.length && !activeMonth) {
+      const now = new Date()
+      const current = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+      setActiveMonth(past12Months.includes(current) ? current : past12Months[past12Months.length - 1])
+    }
+  }, [past12Months, activeMonth])
 
   useEffect(() => {
     const load = async () => {
@@ -345,31 +354,44 @@ export default function InputPage() {
                 </select>
               </div>
               <p className="text-sm text-pharma-text-muted mt-2">
-                過去12ヶ月分の実績を一括で入力・編集できます。既に入力済みのデータはそのまま残ります。
+                月タブを切り替えて入力。保存で全12ヶ月分を一括保存します。
               </p>
             </div>
 
-            <div className="space-y-4">
-              {past12Months.map((ym) => (
-                <div key={ym} className="bg-pharma-bg-secondary rounded-xl p-6 border border-pharma">
-                  <h2 className="text-lg font-semibold text-pharma-text-primary mb-4">
+            <div className="bg-pharma-bg-secondary rounded-xl border border-pharma overflow-hidden">
+              <div className="flex gap-1 p-2 overflow-x-auto border-b border-pharma bg-pharma-bg-tertiary/50">
+                {past12Months.map((ym) => (
+                  <button
+                    key={ym}
+                    type="button"
+                    onClick={() => setActiveMonth(ym)}
+                    className={`shrink-0 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      activeMonth === ym
+                        ? 'bg-pharma-accent text-white'
+                        : 'text-pharma-text-secondary hover:bg-pharma-bg-tertiary hover:text-pharma-text-primary'
+                    }`}
+                  >
                     {ym.replace('-', '年')}月
-                  </h2>
+                  </button>
+                ))}
+              </div>
+              {activeMonth && (
+                <div className="p-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {items.map((item) => (
-                      <div key={`${ym}-${item.code}`}>
-                        <label htmlFor={`item-${ym}-${item.code}`} className="block text-sm font-medium text-pharma-text-secondary mb-1.5">
+                      <div key={`${activeMonth}-${item.code}`}>
+                        <label htmlFor={`item-${activeMonth}-${item.code}`} className="block text-sm font-medium text-pharma-text-secondary mb-1.5">
                           {item.name} ({item.unit})
                         </label>
                         <input
-                          id={`item-${ym}-${item.code}`}
+                          id={`item-${activeMonth}-${item.code}`}
                           type="number"
                           min="0"
                           step="0.01"
-                          value={values[ym]?.[item.code] ?? ''}
+                          value={values[activeMonth]?.[item.code] ?? ''}
                           onChange={(e) => setValues((v) => ({
                             ...v,
-                            [ym]: { ...(v[ym] ?? {}), [item.code]: e.target.value },
+                            [activeMonth]: { ...(v[activeMonth] ?? {}), [item.code]: e.target.value },
                           }))}
                           className={inputBase}
                         />
@@ -377,7 +399,7 @@ export default function InputPage() {
                     ))}
                   </div>
                 </div>
-              ))}
+              )}
             </div>
 
             <button type="submit" disabled={saving || !selectedPharmacy} className={btnPrimary}>
