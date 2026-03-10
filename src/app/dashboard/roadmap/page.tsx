@@ -282,7 +282,7 @@ export default function RoadmapPage() {
                         </span>
                       </div>
                       <span className="text-xs font-mono tabular-nums">
-                        <span className={met ? 'text-emerald-400' : 'text-pharma-text-secondary'}>{currentVal}</span>
+                        <span className={met ? 'text-emerald-400' : 'text-pharma-text-secondary'}>{Math.round(currentVal)}</span>
                         <span className="text-pharma-text-muted"> / {target}</span>
                       </span>
                     </div>

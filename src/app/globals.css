@@ -1,4 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -57,6 +58,115 @@ body {
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
   border-radius: 4px;
+}
+
+/* ========================================
+   データ入力画面：frontend-design 完全適用
+   Aesthetic: Clinical precision × warm refinement
+   ======================================== */
+
+.input-page {
+  --input-bg: #fafaf8;
+  --input-bg-card: #ffffff;
+  --input-bg-elevated: #ffffff;
+  --input-accent: #059669;
+  --input-accent-hover: #047857;
+  --input-accent-muted: rgba(5, 150, 105, 0.12);
+  --input-text: #1e293b;
+  --input-text-secondary: #475569;
+  --input-text-muted: #94a3b8;
+  --input-border: #e2e8f0;
+  --input-border-focus: #059669;
+  --input-success: #059669;
+  --input-error: #dc2626;
+  --input-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.06), 0 2px 4px -2px rgba(0, 0, 0, 0.04);
+  --input-shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+  font-family: 'IBM Plex Sans', sans-serif;
+}
+
+.input-page .font-input-heading {
+  font-family: 'Sora', sans-serif;
+}
+
+/* Background: gradient + subtle grid texture */
+.input-page {
+  margin: -2rem -1.5rem 0;
+  padding: 2rem 1.5rem;
+  min-height: calc(100vh - 180px);
+  background: linear-gradient(165deg, #fafaf8 0%, #f1f5f9 50%, #e2e8f0 100%);
+  background-attachment: local;
+  position: relative;
+  border-radius: 1rem 1rem 0 0;
+}
+
+.input-page::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(5, 150, 105, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(5, 150, 105, 0.03) 1px, transparent 1px);
+  background-size: 24px 24px;
+  pointer-events: none;
+}
+
+.input-page > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Typography */
+.input-page h1 {
+  font-family: 'Sora', sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--input-text);
+}
+
+.input-page input[type="number"]::-webkit-inner-spin-button,
+.input-page input[type="number"]::-webkit-outer-spin-button {
+  opacity: 1;
+}
+
+.input-page input[type="number"]:focus {
+  box-shadow: inset 0 0 0 2px var(--input-accent);
+  outline: none;
+}
+
+/* Motion: staggered fade-in */
+@keyframes input-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.input-page .input-animate-row {
+  animation: input-fade-in 0.4s ease-out backwards;
+}
+
+.input-page .input-animate-row:nth-child(1) { animation-delay: 0.02s; }
+.input-page .input-animate-row:nth-child(2) { animation-delay: 0.04s; }
+.input-page .input-animate-row:nth-child(3) { animation-delay: 0.06s; }
+.input-page .input-animate-row:nth-child(4) { animation-delay: 0.08s; }
+.input-page .input-animate-row:nth-child(5) { animation-delay: 0.1s; }
+.input-page .input-animate-row:nth-child(6) { animation-delay: 0.12s; }
+.input-page .input-animate-row:nth-child(7) { animation-delay: 0.14s; }
+.input-page .input-animate-row:nth-child(8) { animation-delay: 0.16s; }
+.input-page .input-animate-row:nth-child(9) { animation-delay: 0.18s; }
+.input-page .input-animate-row:nth-child(n+10) { animation-delay: 0.2s; }
+
+/* Progress bar fill animation */
+@keyframes input-progress-fill {
+  from { width: 0; }
+}
+
+.input-page .input-progress-bar {
+  animation: input-progress-fill 0.8s ease-out;
 }
 
 @media (prefers-reduced-motion: reduce) {

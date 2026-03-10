@@ -113,12 +113,14 @@ export function getShortageForKasan(
         const met = th.operator === '>=' ? current >= target : current > target
 
         let message: string
+        const currInt = Math.round(current)
+        const shortInt = Math.round(shortage)
         if (met) {
-          message = `達成（${current.toFixed(1)}${unit}）`
+          message = `達成（${currInt}${unit}）`
         } else if (shortage > 0) {
-          message = `あと${shortage.toFixed(1)}${unit}（現在${current.toFixed(1)}）`
+          message = `あと${shortInt}${unit}（現在${currInt}）`
         } else {
-          message = `未達成（現在${current.toFixed(1)}${unit}）`
+          message = `未達成（現在${currInt}${unit}）`
         }
 
         items.push({

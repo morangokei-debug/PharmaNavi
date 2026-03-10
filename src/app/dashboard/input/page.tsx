@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef, Fragment } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 
@@ -28,6 +28,42 @@ type ImportLog = {
 }
 
 const STORAGE_KEY = 'pharmanavi-input-pharmacy'
+const DRAFT_STORAGE_KEY = 'pharmanavi-input-draft'
+
+/** 項目をカテゴリ別にグループ化（手入力時の視認性向上） */
+const ITEM_GROUPS: Record<string, string[]> = {
+  '処方箋・基本': ['shohosen_count', 'kohatsu_ratio', 'mynumber_confirm_pct', 'denshi_count', 'chofuku_count'],
+  '在宅・訪問': ['zaitaku_visit', 'zaitaku_visit_kojinka'],
+  '服薬支援': ['fukuyaku_follow', 'gairai_fukuyaku_count', 'fukuyaku_info_count'],
+  '加算関連': ['mayaku_count', 'kakaritsuke_count', 'zanryaku_yugai_count', 'jikangai_count'],
+  'その他': ['shouni_tokutei_count', 'renkei_kaigi_count'],
+}
+
+function groupItems(items: Item[]): { group: string; items: Item[] }[] {
+  const byCode = Object.fromEntries(items.map((i) => [i.code, i]))
+  const result: { group: string; items: Item[] }[] = []
+  const used = new Set<string>()
+
+  for (const [groupName, codes] of Object.entries(ITEM_GROUPS)) {
+    const groupItemsList = codes
+      .map((c) => byCode[c])
+      .filter(Boolean) as Item[]
+    if (groupItemsList.length) {
+      groupItemsList.forEach((i) => used.add(i.code))
+      result.push({ group: groupName, items: groupItemsList })
+    }
+  }
+  const rest = items.filter((i) => !used.has(i.code))
+  if (rest.length) {
+    const otherIdx = result.findIndex((r) => r.group === 'その他')
+    if (otherIdx >= 0) {
+      result[otherIdx].items = [...result[otherIdx].items, ...rest]
+    } else {
+      result.push({ group: 'その他', items: rest })
+    }
+  }
+  return result
+}
 
 export default function InputPage() {
   const [pharmacies, setPharmacies] = useState<Pharmacy[]>([])
@@ -42,24 +78,19 @@ export default function InputPage() {
     }
   }
   const [loading, setLoading] = useState(true)
+  const [recordsLoading, setRecordsLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [csvFile, setCsvFile] = useState<File | null>(null)
   const [csvImportTargetMonth, setCsvImportTargetMonth] = useState('')
   const [csvImporting, setCsvImporting] = useState(false)
   const [importLogs, setImportLogs] = useState<ImportLog[]>([])
-  const [activeMonth, setActiveMonth] = useState('')
+  const [csvOpen, setCsvOpen] = useState(false)
   const supabase = createClient()
+  const formRef = useRef<HTMLFormElement>(null)
 
   const past12Months = useMemo(() => getPast12Months(), [])
-
-  useEffect(() => {
-    if (past12Months.length && !activeMonth) {
-      const now = new Date()
-      const current = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-      setActiveMonth(past12Months.includes(current) ? current : past12Months[past12Months.length - 1])
-    }
-  }, [past12Months, activeMonth])
+  const groupedItems = useMemo(() => groupItems(items), [items])
 
   useEffect(() => {
     const load = async () => {
@@ -115,26 +146,63 @@ export default function InputPage() {
   }, [])
 
   useEffect(() => {
-    if (!selectedPharmacy || past12Months.length === 0) return
+    if (!selectedPharmacy || past12Months.length === 0) {
+      setRecordsLoading(false)
+      return
+    }
+    let cancelled = false
+    setRecordsLoading(true)
     const load = async () => {
       const { data } = await supabase
         .from('pharma_monthly_records')
         .select('year_month, item_code, value')
         .eq('pharmacy_id', selectedPharmacy)
         .in('year_month', past12Months)
+      if (cancelled) return
       const v: Record<string, Record<string, string>> = {}
       past12Months.forEach((ym) => { v[ym] = {} })
       data?.forEach((r) => {
         if (!v[r.year_month]) v[r.year_month] = {}
         v[r.year_month][r.item_code] = String(r.value)
       })
+      let restoredDraft = false
+      if (typeof window !== 'undefined') {
+        try {
+          const raw = sessionStorage.getItem(DRAFT_STORAGE_KEY)
+          if (raw) {
+            const draft = JSON.parse(raw) as { pharmacy_id: string; values: Record<string, Record<string, string>> }
+            if (draft.pharmacy_id === selectedPharmacy && draft.values) {
+              past12Months.forEach((ym) => {
+                v[ym] = { ...(v[ym] ?? {}), ...(draft.values[ym] ?? {}) }
+              })
+              restoredDraft = true
+            }
+          }
+        } catch {}
+      }
       setValues(v)
+      setRecordsLoading(false)
+      if (restoredDraft && !cancelled) {
+        setMessage('保存していない入力が復元されました。保存ボタンで確定してください。')
+      }
     }
     load()
+    return () => { cancelled = true }
   }, [selectedPharmacy, past12Months])
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault()
+  useEffect(() => {
+    if (!selectedPharmacy || Object.keys(values).length === 0) return
+    try {
+      sessionStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify({
+        pharmacy_id: selectedPharmacy,
+        values,
+        updated_at: new Date().toISOString(),
+      }))
+    } catch {}
+  }, [selectedPharmacy, values])
+
+  const handleSave = useCallback(async (e?: React.FormEvent) => {
+    e?.preventDefault()
     if (!selectedPharmacy) return
     setSaving(true)
     setMessage(null)
@@ -165,7 +233,21 @@ export default function InputPage() {
     }
     setMessage('保存しました（過去12ヶ月分）')
     setSaving(false)
-  }
+    try {
+      sessionStorage.removeItem(DRAFT_STORAGE_KEY)
+    } catch {}
+  }, [selectedPharmacy, past12Months, items, values, supabase])
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 's' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault()
+        handleSave()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [handleSave])
 
   const handleCsvImport = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -205,213 +287,273 @@ export default function InputPage() {
     setCsvImporting(false)
   }
 
-  const inputBase = 'w-full px-4 py-3 bg-pharma-bg-tertiary border border-pharma rounded-lg text-pharma-text-primary placeholder-pharma-muted transition-[border-color,box-shadow] focus:outline-none focus:border-pharma-focus focus:ring-[3px] focus:ring-[var(--accent-glow)] focus:ring-offset-0 disabled:opacity-40 disabled:cursor-not-allowed'
-  const btnPrimary = 'min-h-[40px] px-6 py-3 bg-pharma-accent text-white font-semibold rounded-lg shadow-glow transition-all hover:bg-pharma-accent-secondary hover:shadow-glow-lg active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-pharma-focus focus-visible:outline-offset-3'
+  const updateValue = useCallback((ym: string, code: string, val: string) => {
+    setValues((v) => ({
+      ...v,
+      [ym]: { ...(v[ym] ?? {}), [code]: val },
+    }))
+  }, [])
+
+  const filledCount = useMemo(() => {
+    let n = 0
+    for (const ym of past12Months) {
+      for (const item of items) {
+        const v = values[ym]?.[item.code]?.trim()
+        if (v && parseFloat(v) !== 0) n++
+      }
+    }
+    return n
+  }, [values, past12Months, items])
+
+  const totalCells = past12Months.length * items.length
+  const progressPct = totalCells > 0 ? Math.round((filledCount / totalCells) * 100) : 0
 
   if (loading) {
     return (
-      <div>
-        <div className="h-8 w-48 skeleton mb-6" />
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          <div className="h-20 skeleton rounded-xl" />
-          <div className="h-20 skeleton rounded-xl" />
-        </div>
-        <div className="space-y-3">
-          {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="h-12 skeleton rounded-lg" />
-          ))}
+      <div className="input-page min-h-[400px] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 border-2 border-[var(--input-accent)]/30 border-t-[var(--input-accent)] rounded-full animate-spin" />
+          <p className="text-[var(--input-text-muted)] text-sm">読み込み中...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div>
-      <h1 className="text-2xl font-heading font-bold text-pharma-text-primary mb-6">データ入力</h1>
+    <div className="input-page">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6 input-animate-row">
+        <div>
+          <h1 className="text-2xl font-input-heading font-bold text-[var(--input-text)] tracking-tight">
+            データ入力
+          </h1>
+          <p className="text-[var(--input-text-muted)] text-sm mt-1">
+            タブでセル間を移動。Ctrl+S で保存。全12ヶ月を一括保存します。
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <select
+            value={selectedPharmacy}
+            onChange={(e) => setSelectedPharmacy(e.target.value)}
+            className="h-11 px-4 rounded-xl bg-[var(--input-bg-card)] border border-[var(--input-border)] text-[var(--input-text)] text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[var(--input-accent)] focus:border-transparent transition-all duration-200 shadow-sm hover:shadow-md"
+          >
+            <option value="">店舗を選択</option>
+            {pharmacies.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={() => formRef.current?.requestSubmit()}
+            disabled={saving || recordsLoading || !selectedPharmacy}
+            className="h-11 px-6 rounded-xl bg-[var(--input-accent)] text-white font-semibold text-sm shadow-lg hover:bg-[var(--input-accent-hover)] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+          >
+            {saving ? (
+              <span className="inline-flex items-center gap-2">
+                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                保存中...
+              </span>
+            ) : (
+              '保存'
+            )}
+          </button>
+        </div>
+      </div>
+
+      {message && (
+        <div
+          role="alert"
+          className={`mb-4 px-4 py-3 rounded-xl text-sm font-medium input-animate-row ${
+            message.includes('失敗')
+              ? 'bg-[var(--input-error)]/15 text-[var(--input-error)] border border-[var(--input-error)]/30'
+              : 'bg-[var(--input-success)]/15 text-[var(--input-success)] border border-[var(--input-success)]/30'
+          }`}
+        >
+          {message}
+        </div>
+      )}
 
       {pharmacies.length === 0 ? (
-        <div className="bg-pharma-bg-secondary border border-pharma-warning/50 rounded-xl p-6">
-          <p className="text-pharma-warning font-medium">店舗が登録されていません</p>
-          <p className="text-pharma-text-secondary text-sm mt-2">
-            <Link href="/dashboard/settings" className="text-pharma-accent underline hover:text-pharma-accent-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-pharma-focus focus-visible:rounded">設定</Link>から組織と店舗を作成してください。
+        <div className="bg-[var(--input-bg-card)] border-2 border-amber-400/50 rounded-2xl p-8 shadow-lg input-animate-row">
+          <p className="text-amber-400 font-semibold">店舗が登録されていません</p>
+          <p className="text-[var(--input-text-secondary)] text-sm mt-2">
+            <Link href="/dashboard/settings" className="text-[var(--input-accent)] underline hover:text-[var(--input-accent-hover)] font-medium">設定</Link>から組織と店舗を作成してください。
           </p>
         </div>
       ) : (
         <>
-          {message && (
-            <div
-              role="alert"
-              className={`mb-4 p-3 rounded-lg text-sm border ${
-                message.includes('失敗')
-                  ? 'bg-pharma-error/10 text-pharma-error border-pharma-error/50'
-                  : 'bg-pharma-success/10 text-pharma-success border-pharma-success/50'
-              }`}
+          {/* CSV取り込み（折りたたみ） */}
+          <div className="mb-6 rounded-2xl border border-[var(--input-border)] overflow-hidden bg-[var(--input-bg-card)] shadow-[var(--input-shadow)] input-animate-row">
+            <button
+              type="button"
+              onClick={() => setCsvOpen((o) => !o)}
+              className="w-full flex items-center justify-between px-5 py-4 text-left text-[var(--input-text-secondary)] hover:text-[var(--input-text)] hover:bg-[var(--input-accent-muted)] transition-all duration-200"
             >
-              {message}
-            </div>
-          )}
-
-          <div className="mb-6 bg-pharma-bg-secondary rounded-xl p-6 border border-pharma">
-            <h2 className="text-lg font-semibold text-pharma-text-primary mb-3">CSV取り込み</h2>
-            <p className="text-sm text-pharma-text-muted mb-3">
-              ReceptyなどレセコンのCSVをアップロードすると、列名から自動でマッピングして月次実績に取り込みます。取り込み先の月を選んでください。
-            </p>
-            <form onSubmit={handleCsvImport} className="flex flex-wrap items-end gap-3">
-              <div className="min-w-[140px]">
-                <label htmlFor="csv-target-month" className="block text-sm font-medium text-pharma-text-secondary mb-1.5">
-                  取り込み先の月
-                </label>
-                <select
-                  id="csv-target-month"
-                  value={csvImportTargetMonth}
-                  onChange={(e) => setCsvImportTargetMonth(e.target.value)}
-                  className={inputBase}
-                >
-                  {past12Months.map((ym) => (
-                    <option key={ym} value={ym}>
-                      {ym.replace('-', '年')}月
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex-1 min-w-[200px]">
-                <label htmlFor="csv-file" className="block text-sm font-medium text-pharma-text-secondary mb-1.5">
-                  CSVファイル
-                </label>
-                <input
-                  id="csv-file"
-                  type="file"
-                  accept=".csv"
-                  onChange={(e) => setCsvFile(e.target.files?.[0] ?? null)}
-                  className="block w-full text-sm text-pharma-text-secondary file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-pharma-bg-tertiary file:text-pharma-accent file:font-medium file:cursor-pointer hover:file:bg-pharma-accent/20"
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={csvImporting || !csvFile || !selectedPharmacy}
-                className={btnPrimary}
-              >
-                {csvImporting ? (
-                  <span className="inline-flex items-center gap-2">
-                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" aria-hidden />
-                    取り込み中...
-                  </span>
-                ) : (
-                  '取り込む'
+              <span className="font-medium text-sm">CSV取り込み</span>
+              <span className="text-[var(--input-text-muted)] text-xs">
+                ReceptyなどレセコンのCSVをアップロード
+              </span>
+              <span className={`text-[var(--input-text-muted)] transition-transform duration-200 ${csvOpen ? 'rotate-180' : ''}`}>▼</span>
+            </button>
+            {csvOpen && (
+              <div className="px-5 pb-5 pt-0 border-t border-[var(--input-border)]">
+                <form onSubmit={handleCsvImport} className="flex flex-wrap items-end gap-3 pt-4">
+                  <div className="min-w-[140px]">
+                    <label className="block text-xs font-medium text-[var(--input-text-muted)] mb-1.5">取り込み先の月</label>
+                    <select
+                      value={csvImportTargetMonth}
+                      onChange={(e) => setCsvImportTargetMonth(e.target.value)}
+                      className="w-full h-10 px-3 rounded-lg bg-white border border-[var(--input-border)] text-[var(--input-text)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--input-accent)]"
+                    >
+                      {past12Months.map((ym) => (
+                        <option key={ym} value={ym}>{ym.replace('-', '年')}月</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex-1 min-w-[200px]">
+                    <label className="block text-xs font-medium text-[var(--input-text-muted)] mb-1.5">CSVファイル</label>
+                    <input
+                      type="file"
+                      accept=".csv"
+                      onChange={(e) => setCsvFile(e.target.files?.[0] ?? null)}
+                      className="block w-full text-sm text-[var(--input-text-secondary)] file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-[var(--input-accent-muted)] file:text-[var(--input-accent)] file:font-medium file:cursor-pointer"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={csvImporting || !csvFile || !selectedPharmacy}
+                    className="h-10 px-5 rounded-lg bg-[var(--input-accent-muted)] text-[var(--input-accent)] font-medium text-sm hover:bg-[var(--input-accent)]/20 disabled:opacity-50 transition-colors duration-200"
+                  >
+                    {csvImporting ? '取り込み中...' : '取り込む'}
+                  </button>
+                </form>
+                {importLogs.length > 0 && (
+                  <div className="mt-4 pt-4 border-t border-[var(--input-border)]">
+                    <p className="text-xs text-[var(--input-text-muted)] mb-2">直近の取り込み</p>
+                    <div className="text-xs text-[var(--input-text-secondary)] space-y-1">
+                      {importLogs.slice(0, 3).map((l) => (
+                        <div key={l.id} className="flex gap-2">
+                          <span>{l.file_name}</span>
+                          <span>{l.pharmacy_name}</span>
+                          <span>{l.imported_at ? new Date(l.imported_at).toLocaleDateString('ja-JP') : ''}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 )}
-              </button>
-            </form>
+              </div>
+            )}
           </div>
 
-          {importLogs.length > 0 && (
-            <div className="mb-6 bg-pharma-bg-secondary rounded-xl p-6 border border-pharma">
-              <h2 className="text-lg font-semibold text-pharma-text-primary mb-3">取り込み履歴</h2>
-              <div className="text-sm">
-                <table className="w-full">
-                  <thead>
-                    <tr className="text-pharma-text-muted border-b border-pharma">
-                      <th className="text-left py-2 font-medium">日時</th>
-                      <th className="text-left py-2 font-medium">ファイル</th>
-                      <th className="text-left py-2 font-medium">店舗</th>
-                      <th className="text-right py-2 font-medium">行数</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {importLogs.map((l) => (
-                      <tr key={l.id} className="border-b border-pharma/50">
-                        <td className="py-2 text-pharma-text-secondary">
-                          {new Date(l.imported_at).toLocaleString('ja-JP')}
-                        </td>
-                        <td className="py-2 text-pharma-text-secondary">{l.file_name}</td>
-                        <td className="py-2 text-pharma-text-secondary">{l.pharmacy_name}</td>
-                        <td className="py-2 text-pharma-text-secondary text-right">
-                          {l.row_count != null ? l.row_count.toLocaleString() : '-'}
-                        </td>
+          {/* スプレッドシート型入力テーブル */}
+          <form ref={formRef} onSubmit={handleSave} className="space-y-6">
+            <div className="rounded-2xl border border-[var(--input-border)] overflow-hidden bg-[var(--input-bg-card)] shadow-[var(--input-shadow-lg)] input-animate-row">
+              {/* 進捗バー */}
+              <div className="px-5 py-3 bg-[var(--input-bg)]/80 border-b border-[var(--input-border)] flex items-center gap-4">
+                <div className="flex-1 h-2.5 bg-[var(--input-border)] rounded-full overflow-hidden">
+                  <div
+                    className="input-progress-bar h-full bg-[var(--input-accent)] rounded-full transition-all duration-500"
+                    style={{ width: `${progressPct}%` }}
+                  />
+                </div>
+                <span className="text-xs font-medium text-[var(--input-text-muted)] tabular-nums shrink-0">
+                  {filledCount} / {totalCells} セル
+                </span>
+              </div>
+
+              {recordsLoading ? (
+                <div className="flex items-center justify-center py-24">
+                  <span className="inline-flex items-center gap-2 text-[var(--input-text-muted)]">
+                    <span className="w-5 h-5 border-2 border-[var(--input-accent)]/30 border-t-[var(--input-accent)] rounded-full animate-spin" />
+                    データ読み込み中...
+                  </span>
+                </div>
+              ) : (
+                <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-380px)]">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr>
+                        <th className="sticky left-0 z-20 bg-[#f1f5f9] border-b border-r border-[var(--input-border)] px-4 py-3 text-left text-xs font-semibold text-[var(--input-text-muted)] uppercase tracking-wider min-w-[200px]">
+                          実績項目
+                        </th>
+                        {past12Months.map((ym) => (
+                          <th
+                            key={ym}
+                            className="sticky top-0 z-10 bg-[#f1f5f9] border-b border-[var(--input-border)] px-2 py-3 text-center text-xs font-semibold text-[var(--input-text-secondary)] min-w-[72px]"
+                          >
+                            {ym.replace('-', '年')}月
+                          </th>
+                        ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          <form onSubmit={handleSave} className="space-y-6">
-            <div className="bg-pharma-bg-secondary rounded-xl p-6 border border-pharma">
-              <div>
-                <label htmlFor="pharmacy" className="block text-sm font-medium text-pharma-text-secondary mb-1.5">
-                  店舗
-                </label>
-                  <select
-                    id="pharmacy"
-                    value={selectedPharmacy}
-                    onChange={(e) => setSelectedPharmacy(e.target.value)}
-                  className={inputBase}
-                >
-                  <option value="">選択してください</option>
-                  {pharmacies.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
-              </div>
-              <p className="text-sm text-pharma-text-muted mt-2">
-                月タブを切り替えて入力。保存で全12ヶ月分を一括保存します。
-              </p>
-            </div>
-
-            <div className="bg-pharma-bg-secondary rounded-xl border border-pharma overflow-hidden">
-              <div className="flex gap-1 p-2 overflow-x-auto border-b border-pharma bg-pharma-bg-tertiary/50">
-                {past12Months.map((ym) => (
-                  <button
-                    key={ym}
-                    type="button"
-                    onClick={() => setActiveMonth(ym)}
-                    className={`shrink-0 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      activeMonth === ym
-                        ? 'bg-pharma-accent text-white'
-                        : 'text-pharma-text-secondary hover:bg-pharma-bg-tertiary hover:text-pharma-text-primary'
-                    }`}
-                  >
-                    {ym.replace('-', '年')}月
-                  </button>
-                ))}
-              </div>
-              {activeMonth && (
-                <div className="p-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {items.map((item) => (
-                      <div key={`${activeMonth}-${item.code}`}>
-                        <label htmlFor={`item-${activeMonth}-${item.code}`} className="block text-sm font-medium text-pharma-text-secondary mb-1.5">
-                          {item.name} ({item.unit})
-                        </label>
-                        <input
-                          id={`item-${activeMonth}-${item.code}`}
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={values[activeMonth]?.[item.code] ?? ''}
-                          onChange={(e) => setValues((v) => ({
-                            ...v,
-                            [activeMonth]: { ...(v[activeMonth] ?? {}), [item.code]: e.target.value },
-                          }))}
-                          className={inputBase}
-                        />
-                      </div>
-                    ))}
-                  </div>
+                    </thead>
+                    <tbody>
+                      {groupedItems.map(({ group, items: groupItemsList }) => (
+                        <Fragment key={group}>
+                          <tr>
+                            <td
+                              colSpan={past12Months.length + 1}
+                              className="sticky left-0 bg-[var(--input-accent-muted)] border-b border-[var(--input-border)] px-4 py-2 text-xs font-semibold text-[var(--input-accent)] uppercase tracking-wider font-input-heading"
+                            >
+                              {group}
+                            </td>
+                          </tr>
+                          {groupItemsList.map((item) => (
+                            <tr
+                              key={item.code}
+                              className="input-animate-row hover:bg-[var(--input-accent-muted)]/50 transition-colors duration-150"
+                            >
+                              <td className="sticky left-0 z-10 bg-[var(--input-bg-card)] border-b border-r border-[var(--input-border)] px-4 py-2">
+                                <div className="flex flex-col">
+                                  <span className="text-sm font-medium text-[var(--input-text)]">
+                                    {item.name}
+                                  </span>
+                                  <span className="text-[10px] text-[var(--input-text-muted)]">{item.unit}</span>
+                                </div>
+                              </td>
+                              {past12Months.map((ym) => {
+                                const val = values[ym]?.[item.code] ?? ''
+                                const hasValue = val.trim() !== '' && parseFloat(val) !== 0
+                                return (
+                                  <td
+                                    key={ym}
+                                    className="border-b border-[var(--input-border)] p-0 align-middle"
+                                  >
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step={item.unit === '%' ? '0.1' : '1'}
+                                      value={val}
+                                      onChange={(e) => updateValue(ym, item.code, e.target.value)}
+                                      className={`w-full min-w-[72px] h-11 px-2 text-center text-sm font-mono bg-transparent border-0 border-b border-transparent hover:border-[var(--input-border)] hover:bg-[var(--input-accent-muted)]/30 focus:outline-none focus:bg-[var(--input-accent-muted)]/50 text-[var(--input-text)] placeholder-[var(--input-text-muted)] transition-all duration-150 ${
+                                        hasValue ? 'text-[var(--input-accent)] font-semibold' : ''
+                                      }`}
+                                      placeholder="0"
+                                      tabIndex={0}
+                                    />
+                                  </td>
+                                )
+                              })}
+                            </tr>
+                          ))}
+                        </Fragment>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </div>
 
-            <button type="submit" disabled={saving || !selectedPharmacy} className={btnPrimary}>
-              {saving ? (
-                <span className="inline-flex items-center gap-2">
-                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" aria-hidden />
-                  保存中...
-                </span>
-              ) : (
-                '保存'
-              )}
-            </button>
+            <div className="flex items-center justify-between input-animate-row">
+              <p className="text-xs text-[var(--input-text-muted)]">
+                Ctrl+S で保存できます
+              </p>
+              <button
+                type="submit"
+                disabled={saving || recordsLoading || !selectedPharmacy}
+                className="h-11 px-8 rounded-xl bg-[var(--input-accent)] text-white font-semibold text-sm shadow-lg hover:bg-[var(--input-accent-hover)] transition-all duration-200 disabled:opacity-50"
+              >
+                {saving ? '保存中...' : '保存'}
+              </button>
+            </div>
           </form>
         </>
       )}
