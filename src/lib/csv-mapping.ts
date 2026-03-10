@@ -10,6 +10,7 @@ export const COLUMN_TO_ITEM: Record<string, string> = {
   '受付件数': 'shohosen_count',
   shohosen_count: 'shohosen_count',
   // 在宅
+  '在宅・訪問 総件数': 'zaitaku_visit',
   '在宅患者訪問薬剤管理指導件数': 'zaitaku_visit',
   '在宅患者訪問': 'zaitaku_visit',
   '在宅訪問': 'zaitaku_visit',
