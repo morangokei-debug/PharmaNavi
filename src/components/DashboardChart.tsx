@@ -54,32 +54,33 @@ export function DashboardChart({ pharmacyIds }: { pharmacyIds: string[] }) {
   const maxVal = Math.max(...data.map((d) => d.achieved), 1)
 
   return (
-    <div className="bg-pharma-bg-secondary border border-pharma rounded-xl p-6 mt-8">
+    <div className="bg-pharma-bg-secondary border border-pharma rounded-2xl p-6 mt-8 shadow-lg">
       <h2 className="text-lg font-semibold text-pharma-text-primary mb-4">月別達成推移</h2>
       <div className="h-[240px]">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
             <XAxis
               dataKey="label"
-              stroke="#718096"
+              stroke="#64748b"
               fontSize={12}
               tickLine={false}
-              axisLine={{ stroke: 'rgba(255,255,255,0.08)' }}
+              axisLine={{ stroke: '#e2e8f0' }}
             />
             <YAxis
-              stroke="#718096"
+              stroke="#64748b"
               fontSize={12}
               tickLine={false}
-              axisLine={{ stroke: 'rgba(255,255,255,0.08)' }}
+              axisLine={{ stroke: '#e2e8f0' }}
               domain={[0, maxVal + 2]}
               allowDecimals={false}
             />
             <Tooltip
               contentStyle={{
                 background: 'var(--bg-secondary)',
-                border: '1px solid rgba(255,255,255,0.08)',
-                borderRadius: '8px',
+                border: '1px solid var(--border-color)',
+                borderRadius: '12px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
               }}
               labelStyle={{ color: 'var(--text-primary)' }}
               formatter={(value?: number) => [value ?? 0, '達成数']}

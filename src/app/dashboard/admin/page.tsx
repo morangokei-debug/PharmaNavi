@@ -124,8 +124,16 @@ export default function AdminPage() {
   function getStatusColor(status: string) {
     switch (status) {
       case 'achieved': return 'bg-emerald-500'
-      case 'partial': return 'bg-amber-500'
-      default: return 'bg-slate-600/80'
+      case 'partial': return 'bg-amber-400'
+      default: return 'bg-slate-300'
+    }
+  }
+
+  function getStatusLabel(status: string) {
+    switch (status) {
+      case 'achieved': return '達成'
+      case 'partial': return '一部'
+      default: return '未達'
     }
   }
 
@@ -139,8 +147,11 @@ export default function AdminPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pharma-accent" />
+      <div className="flex items-center justify-center py-24">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 border-2 border-pharma-accent/30 border-t-pharma-accent rounded-full animate-spin" />
+          <p className="text-pharma-text-muted text-sm">読み込み中...</p>
+        </div>
       </div>
     )
   }
@@ -149,10 +160,10 @@ export default function AdminPage() {
     return (
       <div>
         <h1 className="text-2xl font-heading font-bold text-pharma-text-primary mb-6">管理者画面</h1>
-        <div className="bg-pharma-bg-secondary border border-pharma-warning/50 rounded-xl p-6">
-          <p className="text-pharma-warning font-medium">組織・店舗の設定が必要です</p>
+        <div className="bg-pharma-bg-secondary border-2 border-amber-400/50 rounded-2xl p-8 shadow-lg">
+          <p className="text-amber-600 font-semibold">組織・店舗の設定が必要です</p>
           <p className="text-pharma-text-secondary text-sm mt-2">
-            <Link href="/dashboard/settings" className="text-pharma-accent underline hover:text-pharma-accent-secondary">設定</Link>から組織と店舗を作成してください。
+            <Link href="/dashboard/settings" className="text-pharma-accent underline hover:text-pharma-accent-secondary font-medium">設定</Link>から組織と店舗を作成してください。
           </p>
         </div>
       </div>
@@ -160,62 +171,87 @@ export default function AdminPage() {
   }
 
   return (
-    <div>
+    <div className="admin-page">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-heading font-bold text-pharma-text-primary">管理者画面</h1>
+          <h1 className="text-2xl font-heading font-bold text-pharma-text-primary tracking-tight">管理者画面</h1>
           <p className="text-pharma-text-muted text-sm mt-1">複数店舗の加算取得状況を一覧で確認</p>
         </div>
         <div className="flex items-center gap-3">
           <label htmlFor="chozai-filter" className="text-sm font-medium text-pharma-text-secondary">
-            表示
+            表示フィルタ
           </label>
           <select
             id="chozai-filter"
             value={chozaiFilter}
             onChange={(e) => setChozaiFilter(e.target.value as ChozaiFilter)}
-            className="px-4 py-2.5 bg-pharma-bg-secondary border border-pharma rounded-lg text-pharma-text-primary text-sm focus:outline-none focus:ring-2 focus:ring-pharma-accent"
+            className="px-4 py-2.5 bg-pharma-bg-secondary border border-pharma rounded-xl text-pharma-text-primary text-sm font-medium focus:outline-none focus:ring-2 focus:ring-pharma-accent shadow-sm"
           >
             <option value="all">全店舗・全加算</option>
-            <option value="1">基本料１の店舗のみ（加算1〜3）</option>
-            <option value="23">基本料２・３の店舗のみ（加算1,4,5）</option>
+            <option value="1">基本料１の店舗（加算1〜3）</option>
+            <option value="23">基本料２・３の店舗（加算1,4,5）</option>
           </select>
         </div>
       </div>
 
+      {/* 凡例：目立つ位置に */}
+      <div className="mb-6 p-4 bg-pharma-bg-secondary rounded-xl border border-pharma flex flex-wrap items-center gap-6 shadow-sm">
+        <span className="text-sm font-medium text-pharma-text-secondary">凡例：</span>
+        <span className="flex items-center gap-2">
+          <span className="w-5 h-5 rounded-md bg-emerald-500 shadow-sm" />
+          <span className="text-sm text-pharma-text-primary">達成</span>
+        </span>
+        <span className="flex items-center gap-2">
+          <span className="w-5 h-5 rounded-md bg-amber-400 shadow-sm" />
+          <span className="text-sm text-pharma-text-primary">一部達成</span>
+        </span>
+        <span className="flex items-center gap-2">
+          <span className="w-5 h-5 rounded-md bg-slate-300 shadow-sm" />
+          <span className="text-sm text-pharma-text-primary">未達</span>
+        </span>
+        <span className="text-sm text-pharma-text-muted ml-auto">
+          各マスは過去12ヶ月（4月〜翌3月）の月別達成状況です
+        </span>
+      </div>
+
       {filteredPharmacies.length === 0 ? (
-        <div className="bg-pharma-bg-secondary rounded-xl p-8 text-center border border-pharma">
-          <p className="text-pharma-text-muted">該当する店舗がありません</p>
-          <p className="text-sm text-pharma-text-muted mt-1">
+        <div className="bg-pharma-bg-secondary rounded-2xl p-12 text-center border border-pharma shadow-sm">
+          <p className="text-pharma-text-muted font-medium">該当する店舗がありません</p>
+          <p className="text-sm text-pharma-text-muted mt-2">
             <Link href="/dashboard/settings" className="text-pharma-accent underline">設定</Link>で調剤基本料区分を確認してください
           </p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-pharma bg-pharma-bg-secondary">
-          <table className="w-full min-w-[600px]">
+        <div className="overflow-x-auto rounded-2xl border border-pharma bg-pharma-bg-secondary shadow-lg">
+          <table className="w-full min-w-[700px]">
             <thead>
-              <tr className="bg-pharma-bg-tertiary/80">
-                <th className="text-left py-4 px-4 font-semibold text-pharma-text-primary border-b border-pharma sticky left-0 bg-pharma-bg-tertiary/80 z-10 min-w-[160px]">
+              <tr className="bg-slate-100">
+                <th className="text-left py-4 px-5 font-semibold text-pharma-text-primary border-b-2 border-pharma sticky left-0 bg-slate-100 z-10 min-w-[180px]">
                   店舗
                 </th>
                 {displayKasan.map((k) => (
-                  <th key={k.id} className="text-left py-4 px-3 border-b border-pharma min-w-[120px]">
-                    <div className="font-semibold text-pharma-text-primary text-sm">{shortKasanName(k)}</div>
+                  <th key={k.id} className="text-left py-4 px-4 border-b-2 border-pharma min-w-[140px]">
+                    <div className="font-semibold text-pharma-text-primary">{shortKasanName(k)}</div>
                     <div className="text-xs font-normal text-pharma-text-muted mt-0.5">{k.points}点</div>
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {filteredPharmacies.map((ph) => (
-                <tr key={ph.id} className="border-b border-pharma/50 last:border-b-0 hover:bg-pharma-bg-tertiary/40 transition-colors">
-                  <td className="py-4 px-4 sticky left-0 bg-pharma-bg-secondary z-10">
-                    <div className="flex items-center gap-2">
-                      <Link href="/dashboard/roadmap" className="font-medium text-pharma-accent hover:underline">
+              {filteredPharmacies.map((ph, rowIdx) => (
+                <tr
+                  key={ph.id}
+                  className={`border-b border-pharma/60 last:border-b-0 hover:bg-pharma-bg-tertiary/80 transition-colors admin-row ${
+                    rowIdx % 2 === 0 ? 'bg-pharma-bg-secondary' : 'bg-white'
+                  }`}
+                >
+                  <td className="py-4 px-5 sticky left-0 z-10 bg-inherit">
+                    <div className="flex flex-col gap-1">
+                      <Link href="/dashboard/roadmap" className="font-semibold text-pharma-accent hover:text-pharma-accent-secondary hover:underline">
                         {ph.name}
                       </Link>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-pharma-bg-tertiary text-pharma-text-muted">
-                        基本料{ph.chozai_kihon ?? 1}
+                      <span className="text-xs px-2 py-0.5 rounded-md bg-pharma-bg-tertiary text-pharma-text-muted inline-flex w-fit">
+                        調剤基本料{ph.chozai_kihon ?? 1}
                       </span>
                     </div>
                   </td>
@@ -224,7 +260,7 @@ export default function AdminPage() {
                     const applicable = appliesToPharmacy(k.code, chozai)
                     if (!applicable) {
                       return (
-                        <td key={k.id} className="py-4 px-3 text-center text-pharma-text-muted/50 text-sm">
+                        <td key={k.id} className="py-4 px-4 text-center text-pharma-text-muted/60 text-sm">
                           —
                         </td>
                       )
@@ -232,24 +268,29 @@ export default function AdminPage() {
                     const achieved = getAchievedCount(ph.id, k.id)
                     const currentStatus = getStatus(ph.id, k.id, currentMonth)
                     return (
-                      <td key={k.id} className="py-4 px-3">
-                        <div className="flex items-center gap-3">
-                          <div className="flex gap-1" title={`4月〜3月の達成状況`}>
-                            {past12Months.map((ym) => (
-                              <div
-                                key={ym}
-                                className={`w-4 h-5 rounded ${getStatusColor(getStatus(ph.id, k.id, ym))} transition-colors`}
-                                title={`${ym}: ${getStatus(ph.id, k.id, ym) === 'achieved' ? '達成' : getStatus(ph.id, k.id, ym) === 'partial' ? '一部達成' : '未達'}`}
-                              />
-                            ))}
+                      <td key={k.id} className="py-4 px-4">
+                        <div className="flex flex-col gap-2">
+                          {/* 12ヶ月タイムライン（大きく） */}
+                          <div className="flex gap-1" title="4月〜翌3月の月別達成状況">
+                            {past12Months.map((ym) => {
+                              const st = getStatus(ph.id, k.id, ym)
+                              return (
+                                <div
+                                  key={ym}
+                                  className={`w-6 h-6 rounded-md ${getStatusColor(st)} transition-colors flex-shrink-0`}
+                                  title={`${ym}: ${getStatusLabel(st)}`}
+                                />
+                              )
+                            })}
                           </div>
-                          <span className={`text-sm font-medium tabular-nums px-2 py-1 rounded ${
-                            currentStatus === 'achieved' ? 'bg-emerald-500/20 text-emerald-400' :
-                            currentStatus === 'partial' ? 'bg-amber-500/20 text-amber-400' :
-                            'bg-slate-700/50 text-slate-400'
+                          {/* 達成数：明確なラベル */}
+                          <div className={`text-sm font-semibold tabular-nums px-2 py-1 rounded-lg inline-flex w-fit ${
+                            currentStatus === 'achieved' ? 'bg-emerald-100 text-emerald-700' :
+                            currentStatus === 'partial' ? 'bg-amber-100 text-amber-700' :
+                            'bg-slate-100 text-slate-600'
                           }`}>
-                            {achieved}/12
-                          </span>
+                            達成 {achieved}/12ヶ月
+                          </div>
                         </div>
                       </td>
                     )
@@ -260,21 +301,6 @@ export default function AdminPage() {
           </table>
         </div>
       )}
-
-      <div className="mt-4 flex items-center gap-6 text-sm text-pharma-text-muted">
-        <span className="flex items-center gap-2">
-          <span className="w-4 h-5 rounded bg-emerald-500" />
-          達成
-        </span>
-        <span className="flex items-center gap-2">
-          <span className="w-4 h-5 rounded bg-amber-500" />
-          一部達成
-        </span>
-        <span className="flex items-center gap-2">
-          <span className="w-4 h-5 rounded bg-slate-600/80" />
-          未達
-        </span>
-      </div>
     </div>
   )
 }

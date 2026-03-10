@@ -8,7 +8,7 @@ export default function NotFound() {
         <p className="text-pharma-text-muted mb-6">ページが見つかりません</p>
         <Link
           href="/"
-          className="inline-block px-6 py-3 bg-pharma-accent text-white font-semibold rounded-lg hover:bg-pharma-accent-secondary transition-colors"
+          className="inline-block px-6 py-3 bg-pharma-accent text-white font-semibold rounded-xl hover:bg-pharma-accent-secondary transition-colors shadow-lg"
         >
           トップへ戻る
         </Link>

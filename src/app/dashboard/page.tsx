@@ -51,24 +51,24 @@ export default async function DashboardPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-heading font-bold text-pharma-text-primary mb-6">ダッシュボード</h1>
+      <h1 className="text-2xl font-heading font-bold text-pharma-text-primary mb-6 tracking-tight">ダッシュボード</h1>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-pharma-bg-secondary border border-pharma rounded-xl p-6">
+        <div className="bg-pharma-bg-secondary border border-pharma rounded-2xl p-6 shadow-lg hover:shadow-xl transition-shadow">
           <p className="text-sm text-pharma-text-muted mb-1">算定済み加算数</p>
           <p className="text-3xl font-heading font-bold text-pharma-accent">{achievedCount}</p>
         </div>
-        <div className="bg-pharma-bg-secondary border border-pharma rounded-xl p-6">
+        <div className="bg-pharma-bg-secondary border border-pharma rounded-2xl p-6 shadow-lg hover:shadow-xl transition-shadow">
           <p className="text-sm text-pharma-text-muted mb-1">達成率</p>
           <p className="text-3xl font-heading font-bold text-pharma-text-primary">{achievementRate}%</p>
         </div>
-        <div className="bg-pharma-bg-secondary border border-pharma rounded-xl p-6">
+        <div className="bg-pharma-bg-secondary border border-pharma rounded-2xl p-6 shadow-lg hover:shadow-xl transition-shadow">
           <p className="text-sm text-pharma-text-muted mb-1">未達加算数</p>
           <p className="text-3xl font-heading font-bold text-pharma-warning">{pendingCount}</p>
         </div>
       </div>
 
-      <div className="mt-8 bg-pharma-bg-secondary border border-pharma rounded-xl p-6">
+      <div className="mt-8 bg-pharma-bg-secondary border border-pharma rounded-2xl p-6 shadow-lg">
         <h2 className="text-lg font-semibold text-pharma-text-primary mb-4">ようこそ</h2>
         {!profile?.organization_id ? (
           <p className="text-pharma-text-secondary">

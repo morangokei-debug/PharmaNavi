@@ -17,17 +17,17 @@ export function DashboardNav() {
   const pathname = usePathname()
 
   return (
-    <nav className="bg-pharma-bg-secondary border-b border-pharma px-6" role="navigation" aria-label="メインメニュー">
-      <div className="max-w-7xl mx-auto flex gap-1 py-3">
+    <nav className="bg-pharma-bg-secondary/80 backdrop-blur-sm border-b border-pharma px-6" role="navigation" aria-label="メインメニュー">
+      <div className="max-w-7xl mx-auto flex flex-wrap gap-2 py-3">
         {links.map(({ href, label }) => {
           const isActive = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
           return (
             <Link
               key={href}
               href={href}
-              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-pharma-focus focus-visible:outline-offset-2 ${
+              className={`px-4 py-2.5 text-sm font-medium rounded-xl transition-all duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-pharma-focus focus-visible:outline-offset-2 ${
                 isActive
-                  ? 'bg-pharma-accent text-white'
+                  ? 'bg-pharma-accent text-white shadow-md'
                   : 'text-pharma-text-secondary hover:text-pharma-text-primary hover:bg-pharma-bg-tertiary'
               }`}
               aria-current={isActive ? 'page' : undefined}

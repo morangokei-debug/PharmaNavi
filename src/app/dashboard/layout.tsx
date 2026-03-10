@@ -18,7 +18,7 @@ export default async function DashboardLayout({
 
   return (
     <div className="min-h-screen bg-pharma-bg-primary">
-      <header className="bg-pharma-bg-secondary border-b border-pharma px-6 py-4 sticky top-0 z-[100]">
+      <header className="bg-pharma-bg-secondary border-b border-pharma px-6 py-4 sticky top-0 z-[100] shadow-sm">
         <div className="flex items-center justify-between max-w-7xl mx-auto">
           <Link
             href="/dashboard"
@@ -31,7 +31,7 @@ export default async function DashboardLayout({
             <form action={signOut}>
               <button
                 type="submit"
-                className="text-sm px-3 py-2 rounded-lg text-pharma-text-secondary hover:text-pharma-text-primary hover:bg-pharma-bg-tertiary transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-pharma-focus focus-visible:outline-offset-2"
+                className="text-sm px-4 py-2 rounded-lg text-pharma-text-secondary hover:text-pharma-text-primary hover:bg-pharma-bg-tertiary transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-pharma-focus focus-visible:outline-offset-2"
               >
                 ログアウト
               </button>
