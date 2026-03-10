@@ -90,7 +90,7 @@ export async function recalculateKasanStatus(
   const revisionYear = y >= 2026 ? 2026 : 2024
   const { data: kasanList } = await supabase
     .from('pharma_kasan_master')
-    .select('id, requirements_json')
+    .select('id, requirements_json, evaluation_type')
     .eq('revision_year', revisionYear)
 
   if (revisionYear === 2026) {
@@ -100,6 +100,8 @@ export async function recalculateKasanStatus(
 
   let updated = 0
   for (const k of kasanList ?? []) {
+    // 手動加算は再計算で上書きしない（ユーザーが設定画面で算定有無を入力）
+    if ((k as { evaluation_type?: string }).evaluation_type === 'manual') continue
     const req = k.requirements_json as Parameters<typeof evaluateKasanStatus>[0]
     const { status, rate } = evaluateKasanStatus(req, records, yearMonth, yearRecords, approvals)
 

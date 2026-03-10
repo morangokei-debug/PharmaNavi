@@ -326,6 +326,8 @@ export default function RoadmapPage() {
     )
   }
 
+  const currentPharmacyName = pharmacies.find((p) => p.id === selectedPharmacy)?.name ?? ''
+
   return (
     <div>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
@@ -333,17 +335,25 @@ export default function RoadmapPage() {
           <h1 className="text-2xl font-heading font-bold text-pharma-text-primary">加算ロードマップ</h1>
           <p className="text-pharma-text-muted text-sm mt-1">過去12ヶ月の達成推移とリアルタイム進捗</p>
         </div>
-        {pharmacies.length > 1 && (
-          <select
-            value={selectedPharmacy}
-            onChange={(e) => setSelectedPharmacy(e.target.value)}
-            className="bg-pharma-bg-secondary border border-pharma rounded-lg px-3 py-2 text-pharma-text-primary text-sm"
-          >
-            {pharmacies.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
-        )}
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-pharma-text-muted">店舗:</span>
+          {pharmacies.length === 1 ? (
+            <span className="px-3 py-2 bg-pharma-bg-tertiary border border-pharma rounded-lg text-pharma-text-primary font-medium">
+              {currentPharmacyName}
+            </span>
+          ) : (
+            <select
+              value={selectedPharmacy}
+              onChange={(e) => setSelectedPharmacy(e.target.value)}
+              className="bg-pharma-bg-secondary border border-pharma rounded-lg px-3 py-2 text-pharma-text-primary text-sm min-w-[180px]"
+              aria-label="表示する店舗を選択"
+            >
+              {pharmacies.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          )}
+        </div>
       </div>
 
       {displayKasanList.length === 0 ? (

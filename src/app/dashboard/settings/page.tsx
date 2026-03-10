@@ -8,6 +8,8 @@ import { APPROVAL_MASTER } from '@/lib/approval-master'
 type Organization = { id: string; name: string }
 type Pharmacy = { id: string; name: string; organization_id: string; chozai_kihon?: number }
 type Approval = { approval_code: string; approved_at: string | null }
+type ManualKasan = { id: string; code: string; name: string; points: number | null }
+type ManualKasanStatus = { pharmacy_id: string; kasan_id: string; year_month: string; status: string }
 
 export default function SettingsPage() {
   const [orgs, setOrgs] = useState<Organization[]>([])
@@ -23,6 +25,9 @@ export default function SettingsPage() {
   const [editingPharmacyId, setEditingPharmacyId] = useState<string | null>(null)
   const [editOrgName, setEditOrgName] = useState('')
   const [editPharmacyName, setEditPharmacyName] = useState('')
+  const [manualKasanList, setManualKasanList] = useState<ManualKasan[]>([])
+  const [manualKasanStatus, setManualKasanStatus] = useState<ManualKasanStatus[]>([])
+  const [manualKasanYear, setManualKasanYear] = useState(new Date().getFullYear())
   const supabase = createClient()
   const router = useRouter()
 
@@ -83,6 +88,49 @@ export default function SettingsPage() {
       setPharmacies([])
       setApprovalsByPharmacy({})
     }
+
+    // その他加算（手動算定）のマスタと状態を取得
+    const { data: kasanRows } = await supabase
+      .from('pharma_kasan_master')
+      .select('id, code, name, points, evaluation_type')
+      .eq('revision_year', 2026)
+    const manualList = (kasanRows ?? []).filter(
+      (k) => (k as { evaluation_type?: string }).evaluation_type === 'manual'
+    ) as ManualKasan[]
+    setManualKasanList(manualList)
+
+    if (manualList.length > 0 && phData?.length) {
+      const phIds = phData.map((p) => p.id)
+      const kasanIds = manualList.map((k) => k.id)
+      const yearMonths = Array.from({ length: 12 }, (_, i) =>
+        `${manualKasanYear}-${String(i + 1).padStart(2, '0')}`
+      )
+      const { data: statusRows } = await supabase
+        .from('pharma_kasan_status')
+        .select('pharmacy_id, kasan_id, year_month, status')
+        .in('pharmacy_id', phIds)
+        .in('kasan_id', kasanIds)
+        .in('year_month', yearMonths)
+      setManualKasanStatus((statusRows ?? []) as ManualKasanStatus[])
+    } else {
+      setManualKasanStatus([])
+    }
+  }
+
+  const fetchManualKasanStatus = async () => {
+    if (manualKasanList.length === 0 || pharmacies.length === 0) return
+    const phIds = pharmacies.map((p) => p.id)
+    const kasanIds = manualKasanList.map((k) => k.id)
+    const yearMonths = Array.from({ length: 12 }, (_, i) =>
+      `${manualKasanYear}-${String(i + 1).padStart(2, '0')}`
+    )
+    const { data } = await supabase
+      .from('pharma_kasan_status')
+      .select('pharmacy_id, kasan_id, year_month, status')
+      .in('pharmacy_id', phIds)
+      .in('kasan_id', kasanIds)
+      .in('year_month', yearMonths)
+    setManualKasanStatus((data ?? []) as ManualKasanStatus[])
   }
 
   useEffect(() => {
@@ -102,6 +150,13 @@ export default function SettingsPage() {
       subscription.unsubscribe()
     }
   }, [])
+
+  // その他加算の表示年が変わったら状態を再取得
+  useEffect(() => {
+    if (manualKasanList.length > 0 && pharmacies.length > 0) {
+      fetchManualKasanStatus()
+    }
+  }, [manualKasanYear])
 
   const createOrg = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -307,6 +362,42 @@ export default function SettingsPage() {
 
   const isApproved = (pharmacyId: string, code: string) =>
     approvalsByPharmacy[pharmacyId]?.some((a) => a.approval_code === code && a.approved_at) ?? false
+
+  const isManualKasanBilling = (pharmacyId: string, kasanId: string, yearMonth: string) =>
+    manualKasanStatus.some(
+      (s) => s.pharmacy_id === pharmacyId && s.kasan_id === kasanId && s.year_month === yearMonth && s.status === 'achieved'
+    )
+
+  const toggleManualKasan = async (
+    pharmacyId: string,
+    kasanId: string,
+    yearMonth: string,
+    checked: boolean
+  ) => {
+    const res = await fetch('/api/kasan/manual-status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pharmacy_id: pharmacyId,
+        kasan_id: kasanId,
+        year_month: yearMonth,
+        is_billing: checked,
+      }),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      setMessage(err?.error ?? '更新に失敗しました')
+      return
+    }
+    setManualKasanStatus((prev) => {
+      const rest = prev.filter(
+        (s) => !(s.pharmacy_id === pharmacyId && s.kasan_id === kasanId && s.year_month === yearMonth)
+      )
+      return checked
+        ? [...rest, { pharmacy_id: pharmacyId, kasan_id: kasanId, year_month: yearMonth, status: 'achieved' }]
+        : [...rest, { pharmacy_id: pharmacyId, kasan_id: kasanId, year_month: yearMonth, status: 'pending' }]
+    })
+  }
 
   const inputBase = 'px-4 py-3 bg-pharma-bg-tertiary border border-pharma rounded-lg text-pharma-text-primary placeholder-pharma-muted transition-[border-color,box-shadow] focus:outline-none focus:border-pharma-focus focus:ring-[3px] focus:ring-[var(--accent-glow)] focus:ring-offset-0 disabled:opacity-40 disabled:cursor-not-allowed'
   const btnPrimary = 'min-h-[40px] px-4 py-2 bg-pharma-accent text-white font-semibold rounded-lg shadow-glow transition-all hover:bg-pharma-accent-secondary hover:shadow-glow-lg active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-pharma-focus focus-visible:outline-offset-3'
@@ -628,6 +719,67 @@ export default function SettingsPage() {
                           {a.note && <span className="block text-xs text-pharma-text-muted mt-0.5">{a.note}</span>}
                         </span>
                       </label>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {pharmacies.length > 0 && manualKasanList.length > 0 && (
+          <section className="bg-pharma-bg-secondary rounded-xl p-6 border border-pharma">
+            <h2 className="text-lg font-semibold text-pharma-text-primary mb-4">その他加算 算定管理</h2>
+            <p className="text-sm text-pharma-text-muted mb-4">
+              吸入指導加算など、基本料に関係ない加算の算定有無を管理します。算定している月にチェックを入れてください。
+            </p>
+            <div className="mb-4">
+              <label className="block text-sm text-pharma-text-secondary mb-1">表示年</label>
+              <select
+                value={manualKasanYear}
+                onChange={(e) => setManualKasanYear(Number(e.target.value))}
+                className={`${inputBase} max-w-[120px]`}
+              >
+                {[2024, 2025, 2026, 2027].map((y) => (
+                  <option key={y} value={y}>{y}年</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-6 overflow-x-auto">
+              {pharmacies.map((ph) => (
+                <div key={ph.id} className="border border-pharma rounded-lg p-4 bg-pharma-bg-tertiary/50">
+                  <p className="font-medium text-pharma-text-primary mb-3">{ph.name}</p>
+                  <div className="space-y-3">
+                    {manualKasanList.map((kasan) => (
+                      <div key={kasan.id} className="flex flex-wrap items-center gap-4">
+                        <span className="text-sm text-pharma-text-secondary min-w-[180px]">
+                          {kasan.name}
+                          {kasan.points != null && (
+                            <span className="text-pharma-text-muted ml-1">({kasan.points}点)</span>
+                          )}
+                        </span>
+                        <div className="flex flex-wrap gap-2">
+                          {Array.from({ length: 12 }, (_, i) => {
+                            const ym = `${manualKasanYear}-${String(i + 1).padStart(2, '0')}`
+                            const checked = isManualKasanBilling(ph.id, kasan.id, ym)
+                            return (
+                              <label
+                                key={ym}
+                                className="flex items-center gap-1 cursor-pointer text-xs"
+                                title={`${manualKasanYear}年${i + 1}月`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={(e) => toggleManualKasan(ph.id, kasan.id, ym, e.target.checked)}
+                                  className="w-4 h-4 rounded border-pharma bg-pharma-bg-tertiary text-pharma-accent focus:ring-pharma-focus focus:ring-2"
+                                />
+                                <span className="text-pharma-text-muted">{i + 1}月</span>
+                              </label>
+                            )
+                          })}
+                        </div>
+                      </div>
                     ))}
                   </div>
                 </div>
