@@ -161,6 +161,7 @@ export default function InputPage() {
     }
     let cancelled = false
     setRecordsLoading(true)
+    setValues({})
     const load = async () => {
       const { data } = await supabase
         .from('pharma_monthly_records')
@@ -189,7 +190,13 @@ export default function InputPage() {
           }
         } catch {}
       }
-      setValues(v)
+      setValues((prev) => {
+        const merged: Record<string, Record<string, string>> = {}
+        past12Months.forEach((ym) => {
+          merged[ym] = { ...(v[ym] ?? {}), ...(prev[ym] ?? {}) }
+        })
+        return merged
+      })
       setRecordsLoading(false)
       if (restoredDraft && !cancelled) {
         setMessage('保存していない入力が復元されました。保存ボタンで確定してください。')
