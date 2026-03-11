@@ -30,6 +30,15 @@ type ImportLog = {
 const STORAGE_KEY = 'pharmanavi-input-pharmacy'
 const DRAFT_STORAGE_KEY = 'pharmanavi-input-draft'
 
+/** DBの値を表示用に整形（59.0→59、59.4→59.4） */
+function formatValueForDisplay(val: unknown): string {
+  if (val === '' || val == null) return ''
+  const n = Number(val)
+  if (Number.isNaN(n)) return String(val)
+  if (Number.isInteger(n)) return String(Math.round(n))
+  return String(val)
+}
+
 /** 項目をカテゴリ別にグループ化（手入力時の視認性向上） */
 const ITEM_GROUPS: Record<string, string[]> = {
   '処方箋・基本': ['shohosen_count', 'kohatsu_ratio', 'mynumber_confirm_pct', 'denshi_count', 'chofuku_count'],
@@ -163,7 +172,7 @@ export default function InputPage() {
       past12Months.forEach((ym) => { v[ym] = {} })
       data?.forEach((r) => {
         if (!v[r.year_month]) v[r.year_month] = {}
-        v[r.year_month][r.item_code] = String(r.value)
+        v[r.year_month][r.item_code] = formatValueForDisplay(r.value)
       })
       let restoredDraft = false
       if (typeof window !== 'undefined') {
